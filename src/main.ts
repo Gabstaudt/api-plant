@@ -17,7 +17,7 @@ async function bootstrap() {
   SwaggerModule.setup('docs', app, document);
 
   const port = Number(process.env.PORT) || 3001;
-  await app.listen(port, '0.0.0.0'); // opcional: força bind em todas as interfaces
+  await app.listen(port, '0.0.0.0'); 
   const url = await app.getUrl();
   Logger.log(`🚀 API rodando em ${url}  |  Swagger: ${url}/docs`, 'Bootstrap');
 }

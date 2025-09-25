@@ -40,7 +40,7 @@ export class UsersController {
     return this.service.remove(+id);
   }
 
-  // SELF
+
   @Get('me/profile')
   me(@CurrentUser() user: { userId: number }) {
     return this.service.findOne(user.userId);
@@ -52,7 +52,7 @@ export class UsersController {
       fullName: body.fullName,
       email: body.email,
       dateOfBirth: body.dateOfBirth,
-      // role: não alteramos via /me
+  
     });
   }
 }
