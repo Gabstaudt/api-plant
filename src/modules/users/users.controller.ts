@@ -1,9 +1,9 @@
-import { Body, Controller, Delete, Get, Param, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 
 import { UsersService } from './users.service';
-import { UpdateUserDto } from '../auth/dto/update-user.dto';
+import { UpdateUserDto } from '../dto/update-user.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -15,33 +15,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 export class UsersController {
   constructor(private readonly service: UsersService) {}
 
-  // ADMIN
-  @Roles('ADMIN')
-  @Get()
-  findAll() {
-    return this.service.findAll();
-  }
-
-  @Roles('ADMIN')
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.service.findOne(+id);
-  }
-
-  @Roles('ADMIN')
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() body: UpdateUserDto) {
-    return this.service.update(+id, body);
-  }
-
-  @Roles('ADMIN')
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(+id);
-  }
-
-
-  @Get('me/profile')
+  @Get('me')
   me(@CurrentUser() user: { userId: number }) {
     return this.service.findOne(user.userId);
   }
@@ -52,7 +26,31 @@ export class UsersController {
       fullName: body.fullName,
       email: body.email,
       dateOfBirth: body.dateOfBirth,
-  
     });
+  }
+
+  // ADMIN
+  @Roles('ADMIN')
+  @Get()
+  findAll() {
+    return this.service.findAll();
+  }
+
+  @Roles('ADMIN')
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.service.findOne(id);
+  }
+
+  @Roles('ADMIN')
+  @Patch(':id')
+  update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateUserDto) {
+    return this.service.update(id, body);
+  }
+
+  @Roles('ADMIN')
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.service.remove(id);
   }
 }
