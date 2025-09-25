@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: plantdbuser
+      POSTGRES_PASSWORD: plantpassword
+      POSTGRES_DB: plant_db
+    ports:
+      - "5445:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U plantdbuser -d plant_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  pg_data:
