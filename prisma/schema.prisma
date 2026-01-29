@@ -20,4 +20,63 @@ model User {
   role         Role      @default(VIEWER)
   dateOfBirth  DateTime?
   createdAt    DateTime  @default(now())
+
+  plants Plant[]
+  sensors Sensor[]
 }
+
+model Plant {
+  id Int @id @default(autoincrement())
+  plantName String
+  species String
+  location String
+  notes String?
+  tempMax Decimal?
+  tempMin Decimal?
+  umiMax Decimal?
+  umiMin Decimal?
+  lightMax Decimal?
+  lightMin Decimal?
+  phMax Decimal?
+  phMin Decimal?
+  notesConditions String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+
+  sensors Sensor[]
+}
+
+
+model Sensor{
+  id Int @id @default(autoincrement())
+  hardwareId String @unique
+  sensorName String
+  type String
+  location String 
+  plantId Int?
+  readingIntervalSeconds Int?
+  notes String?
+  alertsEnabled Boolean
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  plant Plant? @relation(fields: [plantId], references: [id])
+
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+
+  readings SensorReadings[]
+}
+
+model SensorReadings{
+  id Int @id @default(autoincrement())
+  sensorId Int
+  value Decimal
+  createdAt DateTime @default(now())
+
+  sensor Sensor @relation(fields: [sensorId], references: [id])
+}
+
