@@ -7,17 +7,25 @@ import {
   Param,
   Delete,
   UseGuards,
+  HttpCode,
+  HttpStatus,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { SensorsService } from './sensors.service';
 import { CreateSensorDto } from './dto/create-sensor.dto';
 import { UpdateSensorDto } from './dto/update-sensor.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { GetUser } from '../auth/decorators/get-user.decorator';
+import { SensorReadingService } from './sensorReadings.service';
+import { CreateReadingDto } from './dto/create-reading.dto';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('sensors')
 export class SensorsController {
-  constructor(private readonly sensorsService: SensorsService) {}
+  constructor(
+    private readonly sensorsService: SensorsService,
+    private readonly sensorReadingService: SensorReadingService,
+  ) {}
 
   @Post('create')
   create(
@@ -45,5 +53,17 @@ export class SensorsController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.sensorsService.remove(+id);
+  }
+
+  //criação de leitura do sensor
+  @Post('readings')
+  @HttpCode(HttpStatus.CREATED)
+  async createReading(@Body() createReadingDto: CreateReadingDto) {
+    return this.sensorReadingService.create(createReadingDto);
+  }
+
+  @Get(':id/last-reading')
+  async getLastReading(@Param('id', ParseIntPipe) id: number) {
+    return this.sensorReadingService.findLastReadingSensor(id);
   }
 }
