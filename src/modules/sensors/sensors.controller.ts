@@ -15,9 +15,9 @@ import { SensorsService } from './sensors.service';
 import { CreateSensorDto } from './dto/create-sensor.dto';
 import { UpdateSensorDto } from './dto/update-sensor.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { GetUser } from '../auth/decorators/get-user.decorator';
-import { SensorReadingService } from './sensorReadings.service';
 import { CreateReadingDto } from './dto/create-reading.dto';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
+import { SensorReadingService } from './sensorReadings.service';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('sensors')
@@ -30,9 +30,14 @@ export class SensorsController {
   @Post('create')
   create(
     @Body() createSensorDto: CreateSensorDto,
-    @GetUser() user: { userId: number },
+    @CurrentUser() user: { userId: number },
   ) {
     return this.sensorsService.create(createSensorDto, user.userId);
+  }
+
+  @Get('status')
+  async getSensorsStatus() {
+    return await this.sensorsService.getStatusSensors();
   }
 
   @Get()

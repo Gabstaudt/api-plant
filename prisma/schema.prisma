@@ -12,6 +12,13 @@ enum Role {
   VIEWER
 }
 
+enum SensorType {
+  TEMPERATURE
+  HUMIDITY
+  PH
+  LIGHT
+}
+
 model User {
   id           Int       @id @default(autoincrement())
   fullName     String
@@ -54,7 +61,7 @@ model Sensor{
   id Int @id @default(autoincrement())
   hardwareId String @unique
   sensorName String
-  type String
+  type SensorType
   location String 
   plantId Int?
   readingIntervalSeconds Int?

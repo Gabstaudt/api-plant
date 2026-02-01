@@ -1,6 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { SensorType } from '@prisma/client';
+
 import {
   IsBoolean,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -18,10 +21,10 @@ export class CreateSensorDto {
   @IsString()
   hardwareId!: string;
 
-  @ApiProperty()
+  @ApiProperty({ enum: SensorType })
   @IsNotEmpty()
-  @IsString()
-  type!: string;
+  @IsEnum(SensorType, { message: 'Tipo de sensor inválido' })
+  type!: SensorType;
 
   @ApiProperty()
   @IsNotEmpty()

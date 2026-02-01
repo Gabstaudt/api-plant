@@ -11,7 +11,7 @@ import {
 import { PlantsService } from './plants.service';
 import { CreatePlantDto } from './dto/create-plant.dto';
 import { UpdatePlantDto } from './dto/update-plant.dto';
-import { GetUser } from '../auth/decorators/get-user.decorator';
+import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { AuthGuard } from '@nestjs/passport';
 
 @Controller('plants')
@@ -22,7 +22,7 @@ export class PlantsController {
   @Post('create')
   create(
     @Body() createPlantDto: CreatePlantDto,
-    @GetUser() user: { userId: number },
+    @CurrentUser() user: { userId: number },
   ) {
     return this.plantsService.create(createPlantDto, user.userId);
   }
@@ -30,6 +30,11 @@ export class PlantsController {
   @Get()
   findAll() {
     return this.plantsService.findAll();
+  }
+
+  @Get('status')
+  async getSensorsStatus() {
+    return await this.plantsService.getStatusPlants();
   }
 
   @Get(':id')

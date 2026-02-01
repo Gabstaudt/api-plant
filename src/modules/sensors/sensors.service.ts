@@ -7,6 +7,8 @@ import { CreateSensorDto } from './dto/create-sensor.dto';
 import { UpdateSensorDto } from './dto/update-sensor.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SensorEntity } from './entities/sensor.entity';
+import { SensorStatusResponse } from './entities/statusSensor.interface';
+import { SensorType } from '@prisma/client';
 
 @Injectable()
 export class SensorsService {
@@ -56,5 +58,73 @@ export class SensorsService {
 
   remove(id: number) {
     return `This action removes a #${id} sensor`;
+  }
+
+  async getStatusSensors(): Promise<{ data: SensorStatusResponse[] }> {
+    const now = new Date();
+
+    const sensors = await this.prisma.sensor.findMany({
+      include: {
+        plant: true,
+        readings: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    const calcStatusSensors = sensors.map((sensor): SensorStatusResponse => {
+      const lastReading = sensor.readings[0];
+      const alerts: string[] = [];
+
+      // Cálculo de Status Online
+      const intervalMs = ((sensor.readingIntervalSeconds ?? 60) + 60) * 1000;
+      const isOnline = lastReading
+        ? new Date(lastReading.createdAt).getTime() > now.getTime() - intervalMs
+        : false;
+
+      // Verificação de Alertas
+      if (isOnline && sensor.plant && sensor.alertsEnabled && lastReading) {
+        const val = Number(lastReading.value);
+        const p = sensor.plant;
+
+        // Checagem dos parâmetros
+        const check = (max: any, min: any, label: string) => {
+          if (max && val > Number(max)) alerts.push(`${label} alto: ${val}`);
+          if (min && val < Number(min)) alerts.push(`${label} baixo: ${val}`);
+        };
+
+        switch (sensor.type) {
+          case SensorType.TEMPERATURE:
+            check(p.tempMax, p.tempMin, 'Temperatura');
+            break;
+          case SensorType.HUMIDITY:
+            check(p.umiMax, p.umiMin, 'Umidade');
+            break;
+          case SensorType.PH:
+            check(p.phMax, p.phMin, 'PH');
+            break;
+          case SensorType.LIGHT:
+            check(p.lightMax, p.lightMin, 'Luminosidade');
+            break;
+        }
+      }
+
+      return {
+        id: sensor.id,
+        sensorName: sensor.sensorName,
+        hardwareId: sensor.hardwareId,
+        type: sensor.type,
+        location: sensor.location,
+        alertMessages: alerts ? alerts : undefined,
+        status: !isOnline
+          ? 'OFFLINE'
+          : alerts.length > 0
+            ? 'EM ALERTA'
+            : 'ONLINE',
+      };
+    });
+
+    return { data: calcStatusSensors };
   }
 }
