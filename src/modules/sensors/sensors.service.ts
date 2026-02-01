@@ -60,7 +60,25 @@ export class SensorsService {
     return `This action removes a #${id} sensor`;
   }
 
+  //função para remover nulos
+  private removeNulls<T>(obj: any): T {
+    Object.keys(obj).forEach((key) => {
+      if (obj[key] === null || obj[key] === undefined) {
+        delete obj[key];
+      }
+    });
+    return obj as T;
+  }
+
   async getStatusSensors(): Promise<{ data: SensorStatusResponse[] }> {
+    // primeira verificação
+    const existsSensors = await this.prisma.sensor.findFirst();
+    if (!existsSensors)
+      throw new NotFoundException(
+        'Não existe sensores cadastrados no banco de dados',
+      );
+
+    //Início real da função
     const now = new Date();
 
     const sensors = await this.prisma.sensor.findMany({
@@ -73,7 +91,7 @@ export class SensorsService {
       },
     });
 
-    const calcStatusSensors = sensors.map((sensor): SensorStatusResponse => {
+    const result = sensors.map((sensor): SensorStatusResponse => {
       const lastReading = sensor.readings[0];
       const alerts: string[] = [];
 
@@ -110,21 +128,23 @@ export class SensorsService {
         }
       }
 
-      return {
+      const sensorData: SensorStatusResponse = {
         id: sensor.id,
         sensorName: sensor.sensorName,
         hardwareId: sensor.hardwareId,
         type: sensor.type,
         location: sensor.location,
-        alertMessages: alerts ? alerts : undefined,
+        alertMessages: alerts.length > 0 ? alerts : undefined,
         status: !isOnline
           ? 'OFFLINE'
           : alerts.length > 0
             ? 'EM ALERTA'
             : 'ONLINE',
       };
+
+      return this.removeNulls<SensorStatusResponse>(sensorData);
     });
 
-    return { data: calcStatusSensors };
+    return { data: result };
   }
 }
