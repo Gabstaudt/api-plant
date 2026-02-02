@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreatePlantDto } from './dto/create-plant.dto';
 import { UpdatePlantDto } from './dto/update-plant.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -10,7 +14,7 @@ import { SensorType } from '@prisma/client';
 export class PlantsService {
   constructor(private prisma: PrismaService) {}
 
-  //função para remover nulos
+  //função para remover nulos(usado em getters)
   private removeNulls<T>(obj: any): T {
     Object.keys(obj).forEach((key) => {
       if (obj[key] === null || obj[key] === undefined) {
@@ -23,6 +27,19 @@ export class PlantsService {
   // criação de uma planta, conectando a um usuário
   async create(createPlantDto: CreatePlantDto, userId: number) {
     const plant = new PlantEntity(createPlantDto);
+
+    const checkLimits = (max: any, min: any, label: string) => {
+      if (max && min) {
+        if (max < min)
+          throw new BadRequestException(
+            `O valor de ${label} máximo(a) não pode ser menor que de ${label} mínimo(a)`,
+          );
+      }
+    };
+    checkLimits(plant.phMax, plant.phMin, 'ph');
+    checkLimits(plant.tempMax, plant.tempMin, 'temperatura');
+    checkLimits(plant.umiMax, plant.umiMin, 'umidade');
+    checkLimits(plant.lightMax, plant.lightMin, 'luminosidade');
     return this.prisma.plant.create({
       data: {
         ...plant,
@@ -33,7 +50,7 @@ export class PlantsService {
     });
   }
 
-  //retorno de todas as plantas
+  //retorno de todas as plantas(com filtros)
   async findAll(query: {
     page?: number;
     limit?: number;
@@ -134,6 +151,7 @@ export class PlantsService {
       return this.removeNulls<PlantStatusResponse>(plantData);
     });
 
+    //aplicando os demais filtros
     const filteredPlants = status
       ? plantsWithStatus.filter((p) => p.status === status)
       : plantsWithStatus;
@@ -151,6 +169,7 @@ export class PlantsService {
     };
   }
 
+  //Detalhes de uma única planta
   async findOne(id: number) {
     const now = new Date();
 
@@ -264,10 +283,18 @@ export class PlantsService {
     return this.findOne(id);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} plant`;
+  // Exclusão de planta
+  async remove(id: number): Promise<void> {
+    const plant = await this.prisma.plant.findUnique({ where: { id } });
+    if (!plant)
+      throw new NotFoundException('Planta não encontrada no banco de dados');
+
+    await this.prisma.plant.delete({
+      where: { id },
+    });
   }
 
+  //retorno de Status de planta
   async getStatusPlants(): Promise<{ data: PlantStatusResponse[] }> {
     const now = new Date();
 

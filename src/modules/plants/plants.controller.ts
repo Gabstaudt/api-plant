@@ -63,7 +63,8 @@ export class PlantsController {
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.plantsService.remove(+id);
+  async remove(@Param('id') id: string) {
+    await this.plantsService.remove(+id);
+    return { message: `A planta de ID ${id} foi excluída com sucesso` };
   }
 }
