@@ -8,13 +8,23 @@ import { UpdatePlantDto } from './dto/update-plant.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PlantEntity } from './entities/plant.entity';
 import { PlantStatusResponse } from './entities/statusPlants.insterface';
-import { SensorType } from '@prisma/client';
+import { Prisma, SensorType } from '@prisma/client';
+
+type PlantWithSensors = Prisma.PlantGetPayload<{
+  include: {
+    sensors: {
+      include: {
+        readings: true;
+      };
+    };
+  };
+}>;
 
 @Injectable()
 export class PlantsService {
   constructor(private prisma: PrismaService) {}
 
-  //função para remover nulos(usado em getters)
+  //método para remover nulos(usado em getters)
   private removeNulls<T>(obj: any): T {
     Object.keys(obj).forEach((key) => {
       if (obj[key] === null || obj[key] === undefined) {
@@ -22,6 +32,68 @@ export class PlantsService {
       }
     });
     return obj as T;
+  }
+
+  //método de cálculo de alertas e status
+  private calculatePlantHealth(plant: PlantWithSensors) {
+    const now = new Date();
+    let onlineCount = 0;
+    let alertCount = 0;
+    const alertMessages: string[] = [];
+
+    plant.sensors.forEach((sensor) => {
+      const lastReading = sensor.readings[0];
+
+      // Definição da conectividade
+      const interval = (sensor.readingIntervalSeconds ?? 60) + 60;
+      const toleranceMs = interval * 1000;
+      const isOnline =
+        lastReading &&
+        now.getTime() - new Date(lastReading.createdAt).getTime() < toleranceMs;
+
+      if (isOnline) onlineCount++;
+
+      // Lógica de alertas
+      if (sensor.alertsEnabled && lastReading) {
+        const val = Number(lastReading.value);
+
+        const check = (max: any, min: any, label: string) => {
+          if (max && val > Number(max)) {
+            alertMessages.push(
+              `${label} alta no sensor ${sensor.sensorName}: ${val}`,
+            );
+            alertCount++;
+          }
+          if (min && val < Number(min)) {
+            alertMessages.push(
+              `${label} baixa no sensor ${sensor.sensorName}: ${val}`,
+            );
+            alertCount++;
+          }
+        };
+
+        switch (sensor.type) {
+          case SensorType.TEMPERATURE:
+            check(plant.tempMax, plant.tempMin, 'Temperatura');
+            break;
+          case SensorType.HUMIDITY:
+            check(plant.umiMax, plant.umiMin, 'Umidade');
+            break;
+          case SensorType.PH:
+            check(plant.phMax, plant.phMin, 'pH');
+            break;
+          case SensorType.LIGHT:
+            check(plant.lightMax, plant.lightMin, 'Luz');
+            break;
+        }
+      }
+    });
+
+    //Definição do Status Final
+    const status: 'OFFLINE' | 'EM ALERTA' | 'ONLINE' =
+      alertCount > 0 ? 'EM ALERTA' : onlineCount > 0 ? 'ONLINE' : 'OFFLINE';
+
+    return { status, alertMessages };
   }
 
   // criação de uma planta, conectando a um usuário
@@ -70,8 +142,6 @@ export class PlantsService {
       orderBy = 'asc',
     } = query;
 
-    const now = new Date();
-
     const plants = await this.prisma.plant.findMany({
       where: {
         plantName: name ? { startsWith: name, mode: 'insensitive' } : undefined,
@@ -94,58 +164,14 @@ export class PlantsService {
     });
 
     const plantsWithStatus: PlantStatusResponse[] = plants.map((plant) => {
-      let onlineCount = 0;
-      let alertCount = 0;
-      const alerts: string[] = [];
-
-      plant.sensors.forEach((sensor) => {
-        const lastReading = sensor.readings[0];
-        const interval = (sensor.readingIntervalSeconds ?? 60 + 60) * 1000;
-        const isOnline =
-          lastReading &&
-          now.getTime() - new Date(lastReading.createdAt).getTime() < interval;
-
-        if (isOnline) onlineCount++;
-
-        if (sensor.alertsEnabled && lastReading) {
-          const val = Number(lastReading.value);
-          const check = (max: any, min: any, label: string) => {
-            if (max && val > Number(max)) {
-              alerts.push(`${label} alta`);
-              alertCount++;
-            }
-            if (min && val < Number(min)) {
-              alerts.push(`${label} baixa`);
-              alertCount++;
-            }
-          };
-
-          switch (sensor.type) {
-            case SensorType.TEMPERATURE:
-              check(plant.tempMax, plant.tempMin, 'Temperatura');
-              break;
-            case SensorType.HUMIDITY:
-              check(plant.umiMax, plant.umiMin, 'Umidade');
-              break;
-            case SensorType.PH:
-              check(plant.phMax, plant.phMin, 'pH');
-              break;
-            case SensorType.LIGHT:
-              check(plant.lightMax, plant.lightMin, 'Luz');
-              break;
-          }
-        }
-      });
-
-      const finalStatus =
-        alertCount > 0 ? 'EM ALERTA' : onlineCount > 0 ? 'ONLINE' : 'OFFLINE';
+      const { status, alertMessages } = this.calculatePlantHealth(plant);
       const plantData: PlantStatusResponse = {
         id: plant.id,
         plantName: plant.plantName,
         location: plant.location,
         species: plant.species,
-        status: finalStatus,
-        alertMessages: alerts,
+        status: status,
+        alertMessages: alertMessages,
       };
 
       return this.removeNulls<PlantStatusResponse>(plantData);
@@ -171,8 +197,6 @@ export class PlantsService {
 
   //Detalhes de uma única planta
   async findOne(id: number) {
-    const now = new Date();
-
     const plant = await this.prisma.plant.findUnique({
       where: { id },
       include: {
@@ -191,68 +215,15 @@ export class PlantsService {
       throw new NotFoundException(`Planta com ID ${id} não encontrada`);
     }
 
-    // Cálculo de Status
-    let onlineCount = 0;
-    let alertCount = 0;
-    const alerts: string[] = [];
-
-    plant.sensors.forEach((sensor) => {
-      const lastReading = sensor.readings[0];
-      const interval = (sensor.readingIntervalSeconds ?? 60) + 60;
-      const toleranceMs = interval * 1000;
-
-      const isOnline = lastReading
-        ? now.getTime() - new Date(lastReading.createdAt).getTime() <
-          toleranceMs
-        : false;
-
-      if (isOnline) onlineCount++;
-
-      // Verificação de alertas
-      if (sensor.alertsEnabled && lastReading) {
-        const val = Number(lastReading.value);
-
-        const check = (max: any, min: any, label: string) => {
-          if (max && val > Number(max)) {
-            alerts.push(`${label} alta no sensor ${sensor.sensorName}: ${val}`);
-            alertCount++;
-          }
-          if (min && val < Number(min)) {
-            alerts.push(
-              `${label} baixa no sensor ${sensor.sensorName}: ${val}`,
-            );
-            alertCount++;
-          }
-        };
-
-        switch (sensor.type) {
-          case SensorType.TEMPERATURE:
-            check(plant.tempMax, plant.tempMin, 'Temperatura');
-            break;
-          case SensorType.HUMIDITY:
-            check(plant.umiMax, plant.umiMin, 'Umidade');
-            break;
-          case SensorType.PH:
-            check(plant.phMax, plant.phMin, 'pH');
-            break;
-          case SensorType.LIGHT:
-            check(plant.lightMax, plant.lightMin, 'Luz');
-            break;
-        }
-      }
-    });
-
-    // Status Final
-    const finalStatus =
-      alertCount > 0 ? 'EM ALERTA' : onlineCount > 0 ? 'ONLINE' : 'OFFLINE';
+    const { status, alertMessages } = this.calculatePlantHealth(plant);
 
     const result: PlantStatusResponse = {
       id: plant.id,
       plantName: plant.plantName,
       species: plant.species,
       location: plant.location,
-      status: finalStatus,
-      alertMessages: alerts,
+      status: status,
+      alertMessages: alertMessages,
       tempMax: plant.tempMax ? Number(plant.tempMax) : undefined,
       tempMin: plant.tempMin ? Number(plant.tempMin) : undefined,
       umiMax: plant.umiMax ? Number(plant.umiMax) : undefined,
@@ -312,74 +283,15 @@ export class PlantsService {
     });
 
     const result = plants.map((plant) => {
-      const alerts: string[] = [];
-      let onlineCount = 0;
-      let alertCount = 0;
-
-      plant.sensors.forEach((sensor) => {
-        const lastReading = sensor.readings[0];
-
-        const interval = sensor.readingIntervalSeconds ?? 60;
-        const tolerance = (interval + 60) * 1000;
-        const isOnline = lastReading
-          ? new Date(lastReading.createdAt).getTime() >
-            now.getTime() - tolerance
-          : false;
-
-        if (isOnline) {
-          onlineCount++;
-
-          if (sensor.alertsEnabled && lastReading) {
-            const val = Number(lastReading.value);
-
-            const check = (max: any, min: any, label: string) => {
-              if (max && val > Number(max)) {
-                alerts.push(
-                  `${label} alta no sensor ${sensor.sensorName}: ${val}`,
-                );
-                alertCount++;
-              }
-              if (min && val < Number(min)) {
-                alerts.push(
-                  `${label} baixa no sensor ${sensor.sensorName}: ${val}`,
-                );
-                alertCount++;
-              }
-            };
-
-            switch (sensor.type) {
-              case SensorType.TEMPERATURE:
-                check(plant.tempMax, plant.tempMin, 'Temperatura');
-                break;
-              case SensorType.HUMIDITY:
-                check(plant.umiMax, plant.umiMin, 'Umidade');
-                break;
-              case SensorType.PH:
-                check(plant.phMax, plant.phMin, 'pH');
-                break;
-              case SensorType.LIGHT:
-                check(plant.lightMax, plant.lightMin, 'Luz');
-                break;
-            }
-          }
-        }
-      });
-
-      let finalStatus: 'OFFLINE' | 'EM ALERTA' | 'ONLINE' = 'OFFLINE';
-
-      if (plant.sensors.length > 0 && onlineCount > 0) {
-        finalStatus = alertCount > 0 ? 'EM ALERTA' : 'ONLINE';
-      } else {
-        finalStatus = 'OFFLINE';
-      }
+      const { status, alertMessages } = this.calculatePlantHealth(plant);
 
       const plantData: PlantStatusResponse = {
         id: plant.id,
         plantName: plant.plantName,
         species: plant.species,
         location: plant.location,
-        status: finalStatus,
-        alertMessages: alerts.length > 0 ? alerts : undefined,
+        status: status,
+        alertMessages: alertMessages.length > 0 ? alertMessages : undefined,
         tempMax: plant.tempMax ? Number(plant.tempMax) : undefined,
         tempMin: plant.tempMin ? Number(plant.tempMin) : undefined,
         umiMax: plant.umiMax ? Number(plant.umiMax) : undefined,
