@@ -1,3 +1,5 @@
+import { Decimal } from '@prisma/client/runtime/library';
+
 export interface PlantStatusResponse {
   id: number;
   plantName: string;
@@ -15,4 +17,9 @@ export interface PlantStatusResponse {
   notesConditions?: string;
   status: 'OFFLINE' | 'EM ALERTA' | 'ONLINE';
   alertMessages?: string[];
+  sensorsCount?: number;
+  umiCurrent?: Decimal;
+  phCurrent?: Decimal;
+  tempCurrent?: Decimal;
+  lightCurrrent?: Decimal;
 }

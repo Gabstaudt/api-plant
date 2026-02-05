@@ -9,6 +9,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { PlantEntity } from './entities/plant.entity';
 import { PlantStatusResponse } from './entities/statusPlants.insterface';
 import { Prisma, SensorType } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 
 type PlantWithSensors = Prisma.PlantGetPayload<{
   include: {
@@ -40,8 +41,19 @@ export class PlantsService {
     let onlineCount = 0;
     let alertCount = 0;
     const alertMessages: string[] = [];
+    let sensorsCount = 0;
+
+    type SensorReading = {
+      id: number;
+      createdAt: Date;
+      sensorId: number;
+      value: Decimal;
+    };
+
+    const lastReadingsSensors: Partial<Record<SensorType, SensorReading>> = {};
 
     plant.sensors.forEach((sensor) => {
+      sensorsCount++;
       const lastReading = sensor.readings[0];
 
       // Definição da conectividade
@@ -71,20 +83,31 @@ export class PlantsService {
             alertCount++;
           }
         };
-
         switch (sensor.type) {
-          case SensorType.TEMPERATURE:
+          case SensorType.TEMPERATURE: {
             check(plant.tempMax, plant.tempMin, 'Temperatura');
+            const tempCurrent = lastReading;
+            lastReadingsSensors[SensorType.TEMPERATURE] = tempCurrent;
             break;
-          case SensorType.HUMIDITY:
+          }
+          case SensorType.HUMIDITY: {
             check(plant.umiMax, plant.umiMin, 'Umidade');
+            const umiCurrent = lastReading;
+            lastReadingsSensors[SensorType.HUMIDITY] = umiCurrent;
             break;
-          case SensorType.PH:
+          }
+          case SensorType.PH: {
             check(plant.phMax, plant.phMin, 'pH');
+            const phCurrent = lastReading;
+            lastReadingsSensors[SensorType.PH] = phCurrent;
             break;
-          case SensorType.LIGHT:
+          }
+          case SensorType.LIGHT: {
             check(plant.lightMax, plant.lightMin, 'Luz');
+            const lightCurrent = lastReading;
+            lastReadingsSensors[SensorType.LIGHT] = lightCurrent;
             break;
+          }
         }
       }
     });
@@ -93,7 +116,7 @@ export class PlantsService {
     const status: 'OFFLINE' | 'EM ALERTA' | 'ONLINE' =
       alertCount > 0 ? 'EM ALERTA' : onlineCount > 0 ? 'ONLINE' : 'OFFLINE';
 
-    return { status, alertMessages };
+    return { status, alertMessages, lastReadingsSensors, sensorsCount };
   }
 
   // criação de uma planta, conectando a um usuário
@@ -164,7 +187,8 @@ export class PlantsService {
     });
 
     const plantsWithStatus: PlantStatusResponse[] = plants.map((plant) => {
-      const { status, alertMessages } = this.calculatePlantHealth(plant);
+      const { status, alertMessages, lastReadingsSensors, sensorsCount } =
+        this.calculatePlantHealth(plant);
       const plantData: PlantStatusResponse = {
         id: plant.id,
         plantName: plant.plantName,
@@ -172,6 +196,19 @@ export class PlantsService {
         species: plant.species,
         status: status,
         alertMessages: alertMessages,
+        phCurrent: lastReadingsSensors.PH
+          ? lastReadingsSensors.PH.value
+          : undefined,
+        umiCurrent: lastReadingsSensors.HUMIDITY
+          ? lastReadingsSensors.HUMIDITY.value
+          : undefined,
+        tempCurrent: lastReadingsSensors.TEMPERATURE
+          ? lastReadingsSensors.TEMPERATURE.value
+          : undefined,
+        lightCurrrent: lastReadingsSensors.LIGHT
+          ? lastReadingsSensors.LIGHT.value
+          : undefined,
+        sensorsCount: sensorsCount,
       };
 
       return this.removeNulls<PlantStatusResponse>(plantData);
