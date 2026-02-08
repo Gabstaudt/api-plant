@@ -165,6 +165,13 @@ export class PlantsService {
       orderBy = 'asc',
     } = query;
 
+    const validStatuses = ['ONLINE', 'OFFLINE', 'EM ALERTA'];
+    if (status && !validStatuses.includes(status)) {
+      throw new BadRequestException(
+        `Status inválido. Valores aceitos: ${validStatuses.join(', ')}`,
+      );
+    }
+
     const plants = await this.prisma.plant.findMany({
       where: {
         plantName: name ? { startsWith: name, mode: 'insensitive' } : undefined,
@@ -233,7 +240,7 @@ export class PlantsService {
   }
 
   //Detalhes de uma única planta
-  async findOne(id: number) {
+  async findOne(id: number): Promise<PlantStatusResponse> {
     const plant = await this.prisma.plant.findUnique({
       where: { id },
       include: {

@@ -23,7 +23,9 @@ export class CreateSensorDto {
 
   @ApiProperty({ enum: SensorType })
   @IsNotEmpty()
-  @IsEnum(SensorType, { message: 'Tipo de sensor inválido' })
+  @IsEnum(SensorType, {
+    message: `O tipo deve ser um dos valores: ${Object.values(SensorType).join(', ')}`,
+  })
   type!: SensorType;
 
   @ApiProperty()

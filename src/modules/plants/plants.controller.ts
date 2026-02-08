@@ -35,12 +35,14 @@ export class PlantsController {
     @Query('limit') limit?: number,
     @Query('name') name?: string,
     @Query('status') status?: 'ONLINE' | 'OFFLINE' | 'EM ALERTA',
+    @Query('location') location?: string,
   ) {
     return this.plantsService.findAll({
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 10,
       name,
       status,
+      location,
     });
   }
 

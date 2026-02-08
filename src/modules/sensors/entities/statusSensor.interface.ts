@@ -6,4 +6,7 @@ export interface SensorStatusResponse {
   location: string;
   status: 'OFFLINE' | 'EM ALERTA' | 'ONLINE';
   alertMessages?: string[];
+  lastReading?: number;
+  notes?: string;
+  plantName?: string;
 }
