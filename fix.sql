@@ -1,0 +1,1 @@
+TRUNCATE TABLE "Sensor", "SensorReadings", "Plant" RESTART IDENTITY CASCADE;
