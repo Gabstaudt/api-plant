@@ -51,6 +51,8 @@ export class SensorsController {
     @Query('status') status?: 'ONLINE' | 'OFFLINE' | 'EM ALERTA',
     @Query('type') type?: SensorType,
     @Query('location') location?: string,
+    @Query('plantName') plantName?: string,
+    @Query('orderBy') orderBy?: 'asc' | 'desc',
   ) {
     return this.sensorsService.findAll({
       page: page ? Number(page) : 1,
@@ -59,6 +61,8 @@ export class SensorsController {
       status,
       type,
       location,
+      plantName,
+      orderBy,
     });
   }
 

@@ -34,8 +34,10 @@ export class PlantsController {
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('name') name?: string,
+    @Query('species') species?: string,
     @Query('status') status?: 'ONLINE' | 'OFFLINE' | 'EM ALERTA',
     @Query('location') location?: string,
+    @Query('orderBy') orderBy?: 'asc' | 'desc',
   ) {
     return this.plantsService.findAll({
       page: page ? Number(page) : 1,
@@ -43,6 +45,8 @@ export class PlantsController {
       name,
       status,
       location,
+      species,
+      orderBy,
     });
   }
 

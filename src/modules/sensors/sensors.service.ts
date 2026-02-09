@@ -33,6 +33,7 @@ export class SensorsService {
     return obj as T;
   }
 
+  //função de retorno de status e alertas
   private calculateStatus(sensor: SensorWithPlant) {
     const now = new Date();
     const lastReading = sensor.readings[0];
@@ -110,6 +111,7 @@ export class SensorsService {
     });
   }
 
+  // retorno de todos os sensores, com filtros
   async findAll(query: {
     page?: number;
     limit?: number;
@@ -141,6 +143,13 @@ export class SensorsService {
     if (status && !validStatuses.includes(status)) {
       throw new BadRequestException(
         `Status inválido. Valores aceitos: ${validStatuses.join(', ')}`,
+      );
+    }
+
+    const validorder = ['asc', 'desc'];
+    if (orderBy && !validorder.includes(orderBy)) {
+      throw new BadRequestException(
+        `Ordem inválida. Valores aceitos: ${validorder.join(', ')}`,
       );
     }
     const sensors = await this.prisma.sensor.findMany({
@@ -198,6 +207,7 @@ export class SensorsService {
     };
   }
 
+  // retorno de 1 sensor
   async findOne(id: number): Promise<SensorStatusResponse> {
     const sensor = await this.prisma.sensor.findUnique({
       where: { id },
@@ -214,9 +224,8 @@ export class SensorsService {
       throw new NotFoundException(`Sensor com ID ${id} não encontrado`);
     }
     const { status, alerts } = this.calculateStatus(sensor);
-    const lastReadingValue = Number(sensor.readings[0]?.value); // Ajuste conforme o nome do campo de valor no seu banco
+    const lastReadingValue = Number(sensor.readings[0]?.value);
 
-    // 4. Monta o objeto seguindo a interface SensorStatusResponse
     const sensorData: SensorStatusResponse = {
       id: sensor.id,
       sensorName: sensor.sensorName,
@@ -224,7 +233,7 @@ export class SensorsService {
       type: sensor.type,
       location: sensor.location,
       status: status,
-      alertMessages: alerts,
+      alertMessages: alerts.length > 0 ? alerts : undefined,
       lastReading: lastReadingValue,
       notes: sensor.notes ? sensor.notes : undefined,
       plantName: sensor.plant?.plantName,
@@ -233,6 +242,7 @@ export class SensorsService {
     return this.removeNulls<SensorStatusResponse>(sensorData);
   }
 
+  // edução de sensor
   async update(
     id: number,
     updateSensorDto: UpdateSensorDto,
@@ -250,6 +260,7 @@ export class SensorsService {
     return this.findOne(id);
   }
 
+  // exclusão de sensor
   async remove(id: number): Promise<void> {
     const sensor = await this.prisma.sensor.findUnique({ where: { id } });
     if (!sensor) {
@@ -261,6 +272,7 @@ export class SensorsService {
     });
   }
 
+  // retorno de status de sensor
   async getStatusSensors(): Promise<{ data: SensorStatusResponse[] }> {
     // primeira verificação
     const existsSensors = await this.prisma.sensor.findFirst();

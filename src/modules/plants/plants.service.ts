@@ -172,14 +172,21 @@ export class PlantsService {
       );
     }
 
+    const validorder = ['asc', 'desc'];
+    if (orderBy && !validorder.includes(orderBy)) {
+      throw new BadRequestException(
+        `Ordem inválida. Valores aceitos: ${validorder.join(', ')}`,
+      );
+    }
+
     const plants = await this.prisma.plant.findMany({
       where: {
-        plantName: name ? { startsWith: name, mode: 'insensitive' } : undefined,
+        plantName: name ? { contains: name, mode: 'insensitive' } : undefined,
         species: species
-          ? { startsWith: species, mode: 'insensitive' }
+          ? { contains: species, mode: 'insensitive' }
           : undefined,
         location: location
-          ? { startsWith: location, mode: 'insensitive' }
+          ? { contains: location, mode: 'insensitive' }
           : undefined,
       },
       include: {
