@@ -9,4 +9,6 @@ export interface SensorStatusResponse {
   lastReading?: number;
   notes?: string;
   plantName?: string;
+  plantId?: number;
+  updateAt?: Date;
 }

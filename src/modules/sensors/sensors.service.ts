@@ -184,6 +184,8 @@ export class SensorsService {
         hardwareId: sensor.hardwareId,
         plantName: sensor.plant ? sensor.plant.plantName : undefined,
         status: status,
+        updateAt: sensor.updatedAt,
+        plantId: sensor.plantId ? sensor.plantId : undefined,
       };
 
       return this.removeNulls<SensorStatusResponse>(sensorData);
