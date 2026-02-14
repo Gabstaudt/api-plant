@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CreatePlantDto } from './dto/create-plant.dto';
 import { UpdatePlantDto } from './dto/update-plant.dto';
@@ -18,6 +19,7 @@ type PlantWithSensors = Prisma.PlantGetPayload<{
         readings: true;
       };
     };
+    idealRanges: true;
   };
 }>;
 
@@ -121,7 +123,17 @@ export class PlantsService {
 
   // criação de uma planta, conectando a um usuário
   async create(createPlantDto: CreatePlantDto, userId: number) {
+    if (!userId) {
+      throw new UnauthorizedException('Usuário não autenticado');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
     const plant = new PlantEntity(createPlantDto);
+    const idealRanges = createPlantDto.idealRanges ?? [];
 
     const checkLimits = (max: any, min: any, label: string) => {
       if (max && min) {
@@ -135,14 +147,43 @@ export class PlantsService {
     checkLimits(plant.tempMax, plant.tempMin, 'temperatura');
     checkLimits(plant.umiMax, plant.umiMin, 'umidade');
     checkLimits(plant.lightMax, plant.lightMin, 'luminosidade');
-    return this.prisma.plant.create({
+    const checkRange = (max: any, min: any, label: string) => {
+      if (max !== undefined && min !== undefined && max < min) {
+        throw new BadRequestException(
+          `O valor de ${label} máximo(a) não pode ser menor que de ${label} mínimo(a)`,
+        );
+      }
+    };
+
+    idealRanges.forEach((r) => {
+      checkRange(r.max, r.min, r.type);
+    });
+
+    const legacyFromRanges = pickLegacyFromRanges(idealRanges);
+    const { idealRanges: _ignore, ...plantData } = plant;
+
+    const created = await this.prisma.plant.create({
       data: {
-        ...plant,
+        ...plantData,
+        ...legacyFromRanges,
         user: {
           connect: { id: userId },
         },
+        idealRanges: idealRanges.length
+          ? {
+              createMany: {
+                data: idealRanges.map((r) => ({
+                  type: r.type,
+                  unit: r.unit,
+                  min: r.min ?? null,
+                  max: r.max ?? null,
+                })),
+              },
+            }
+          : undefined,
       },
     });
+    return this.findOne(created.id);
   }
 
   //retorno de todas as plantas(com filtros)
@@ -195,6 +236,7 @@ export class PlantsService {
             readings: { orderBy: { createdAt: 'desc' }, take: 1 },
           },
         },
+        idealRanges: true,
       },
 
       orderBy: { plantName: orderBy },
@@ -208,6 +250,16 @@ export class PlantsService {
         plantName: plant.plantName,
         location: plant.location,
         species: plant.species,
+        tempUnit: plant.tempUnit ?? undefined,
+        umiUnit: plant.umiUnit ?? undefined,
+        lightUnit: plant.lightUnit ?? undefined,
+        phUnit: plant.phUnit ?? undefined,
+        idealRanges: plant.idealRanges?.map((r) => ({
+              type: r.type,
+          unit: r.unit,
+          min: r.min ? Number(r.min) : undefined,
+          max: r.max ? Number(r.max) : undefined,
+        })),
         status: status,
         alertMessages: alertMessages,
         phCurrent: lastReadingsSensors.PH
@@ -259,6 +311,7 @@ export class PlantsService {
             },
           },
         },
+        idealRanges: true,
       },
     });
 
@@ -273,6 +326,16 @@ export class PlantsService {
       plantName: plant.plantName,
       species: plant.species,
       location: plant.location,
+      tempUnit: plant.tempUnit ?? undefined,
+      umiUnit: plant.umiUnit ?? undefined,
+      lightUnit: plant.lightUnit ?? undefined,
+      phUnit: plant.phUnit ?? undefined,
+      idealRanges: plant.idealRanges?.map((r) => ({
+              type: r.type,
+        unit: r.unit,
+        min: r.min ? Number(r.min) : undefined,
+        max: r.max ? Number(r.max) : undefined,
+      })),
       status: status,
       alertMessages: alertMessages,
       tempMax: plant.tempMax ? Number(plant.tempMax) : undefined,
@@ -297,9 +360,28 @@ export class PlantsService {
     if (!plant)
       throw new NotFoundException('Planta não encontrada no banco de dados');
 
+    const idealRanges = updatePlantDto.idealRanges ?? [];
+    const legacyFromRanges = pickLegacyFromRanges(idealRanges);
+
     await this.prisma.plant.update({
       where: { id },
-      data: updatePlantDto,
+      data: {
+        ...updatePlantDto,
+        ...legacyFromRanges,
+        idealRanges: idealRanges.length
+          ? {
+              deleteMany: {},
+              createMany: {
+                data: idealRanges.map((r) => ({
+                  type: r.type,
+                  unit: r.unit,
+                  min: r.min ?? null,
+                  max: r.max ?? null,
+                })),
+              },
+            }
+          : { deleteMany: {} },
+      },
     });
 
     return this.findOne(id);
@@ -318,8 +400,6 @@ export class PlantsService {
 
   //retorno de Status de planta
   async getStatusPlants(): Promise<{ data: PlantStatusResponse[] }> {
-    const now = new Date();
-
     const plants = await this.prisma.plant.findMany({
       include: {
         sensors: {
@@ -330,6 +410,7 @@ export class PlantsService {
             },
           },
         },
+        idealRanges: true,
       },
     });
 
@@ -341,6 +422,16 @@ export class PlantsService {
         plantName: plant.plantName,
         species: plant.species,
         location: plant.location,
+        tempUnit: plant.tempUnit ?? undefined,
+        umiUnit: plant.umiUnit ?? undefined,
+        lightUnit: plant.lightUnit ?? undefined,
+        phUnit: plant.phUnit ?? undefined,
+        idealRanges: plant.idealRanges?.map((r) => ({
+              type: r.type,
+          unit: r.unit,
+          min: r.min ? Number(r.min) : undefined,
+          max: r.max ? Number(r.max) : undefined,
+        })),
         status: status,
         alertMessages: alertMessages.length > 0 ? alertMessages : undefined,
         tempMax: plant.tempMax ? Number(plant.tempMax) : undefined,
@@ -362,4 +453,66 @@ export class PlantsService {
 
     return { data: result };
   }
+
+  async getOptions() {
+    const [species, locations, units] = await Promise.all([
+      this.prisma.plant.findMany({
+        distinct: ['species'],
+        select: { species: true },
+        orderBy: { species: 'asc' },
+      }),
+      this.prisma.plant.findMany({
+        distinct: ['location'],
+        select: { location: true },
+        orderBy: { location: 'asc' },
+      }),
+      this.prisma.plantIdealRange.findMany({
+        distinct: ['type', 'unit'],
+        select: { type: true, unit: true },
+        orderBy: [{ type: 'asc' }, { unit: 'asc' }],
+      }),
+    ]);
+
+    const types: string[] = [];
+    const unitList: string[] = [];
+    units.forEach((u) => {
+      if (!types.includes(u.type)) types.push(u.type);
+      if (!unitList.includes(u.unit)) unitList.push(u.unit);
+    });
+
+    return {
+      species: species.map((s) => s.species),
+      locations: locations.map((l) => l.location),
+      types,
+      units: unitList,
+    };
+  }
+}
+
+function pickLegacyFromRanges(
+  ranges: Array<{ type: string; unit: string; min?: number; max?: number }>,
+) {
+  const byType: Record<string, { unit: string; min?: number; max?: number }> =
+    {};
+  ranges.forEach((r) => {
+    const key = r.type.trim().toUpperCase();
+    if (!byType[key]) {
+      byType[key] = { unit: r.unit, min: r.min, max: r.max };
+    }
+  });
+
+  return {
+    tempUnit: byType.TEMPERATURE?.unit,
+    tempMin: byType.TEMPERATURE?.min,
+    tempMax: byType.TEMPERATURE?.max,
+    umiUnit: byType.HUMIDITY?.unit,
+    umiMin: byType.HUMIDITY?.min,
+    umiMax: byType.HUMIDITY?.max,
+    lightUnit: byType.LIGHT?.unit,
+    lightMin: byType.LIGHT?.min,
+    lightMax: byType.LIGHT?.max,
+    phUnit: byType.PH?.unit,
+    phMin: byType.PH?.min,
+    phMax: byType.PH?.max,
+  };
 }

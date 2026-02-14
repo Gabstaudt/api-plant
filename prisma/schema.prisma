@@ -19,6 +19,7 @@ enum SensorType {
   LIGHT
 }
 
+
 model User {
   id           Int       @id @default(autoincrement())
   fullName     String
@@ -38,12 +39,16 @@ model Plant {
   species String
   location String
   notes String?
+  tempUnit String?
   tempMax Decimal?
   tempMin Decimal?
+  umiUnit String?
   umiMax Decimal?
   umiMin Decimal?
+  lightUnit String?
   lightMax Decimal?
   lightMin Decimal?
+  phUnit String?
   phMax Decimal?
   phMin Decimal?
   notesConditions String?
@@ -54,6 +59,20 @@ model Plant {
   user User @relation(fields: [userId], references: [id])
 
   sensors Sensor[]
+  idealRanges PlantIdealRange[]
+}
+
+model PlantIdealRange {
+  id Int @id @default(autoincrement())
+  plantId Int
+  type String
+  unit String
+  min Decimal?
+  max Decimal?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  plant Plant @relation(fields: [plantId], references: [id], onDelete: Cascade)
 }
 
 
