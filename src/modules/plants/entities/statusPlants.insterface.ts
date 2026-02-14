@@ -6,12 +6,16 @@ export interface PlantStatusResponse {
   species: string;
   location: string;
   notes?: string;
+  tempUnit?: string;
   tempMax?: number;
   tempMin?: number;
+  umiUnit?: string;
   umiMax?: number;
   umiMin?: number;
+  lightUnit?: string;
   lightMax?: number;
   lightMin?: number;
+  phUnit?: string;
   phMax?: number;
   phMin?: number;
   notesConditions?: string;
@@ -22,4 +26,10 @@ export interface PlantStatusResponse {
   phCurrent?: Decimal;
   tempCurrent?: Decimal;
   lightCurrrent?: Decimal;
+  idealRanges?: Array<{
+    type: string;
+    unit: string;
+    min?: number;
+    max?: number;
+  }>;
 }
