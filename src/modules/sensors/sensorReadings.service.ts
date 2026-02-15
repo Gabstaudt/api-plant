@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateReadingDto } from './dto/create-reading.dto';
 import { SensorReadingEntity } from './entities/sensorReading.entity';
@@ -26,15 +30,21 @@ export class SensorReadingService {
     const { type, plant } = sensor;
     let min: number | null = null;
     let max: number | null = null;
-    let statusReading: StatusReading = StatusReading.NORMAL;
+    const statusReading: StatusReading = StatusReading.NORMAL;
 
+    const idealRange = plant?.idealRanges?.find(
+      (range: PlantIdealRange) =>
+        range.type.toUpperCase() === type.toUpperCase(),
+    );
+
+    //validação de unidades
     if (plant) {
       switch (type.toUpperCase()) {
         case 'TEMPERATURE':
           min = plant.tempMin ? Number(plant.tempMin) : null;
           max = plant.tempMax ? Number(plant.tempMax) : null;
           break;
-        case 'HUMIDITTY':
+        case 'HUMIDITY':
           min = plant.umiMin ? Number(plant.umiMin) : null;
           max = plant.umiMax ? Number(plant.umiMax) : null;
           break;
@@ -46,34 +56,23 @@ export class SensorReadingService {
           min = plant.lightMin ? Number(plant.lightMin) : null;
           max = plant.lightMax ? Number(plant.lightMax) : null;
           break;
-        default: {
-          const idealRange = plant.idealRanges?.find(
-            (range: PlantIdealRange) =>
-              range.type.toUpperCase() === type.toUpperCase(),
-          );
-          if (!idealRange || (!idealRange.min && !idealRange.max)) {
-            statusReading = StatusReading.NORMAL;
-          } else {
+        default:
+          if (idealRange) {
             min = idealRange.min ? Number(idealRange.min) : null;
             max = idealRange.max ? Number(idealRange.max) : null;
           }
           break;
-        }
       }
     }
-    // Lógica de estado CRÍTICO (Fora dos limites)
+
     if ((min !== null && value < min) || (max !== null && value > max)) {
-      statusReading = StatusReading.CRITICO;
+      return StatusReading.CRITICO;
     }
 
-    // Lógica de estado ATENÇÃO (Dentro dos limites, mas próximo das bordas)
-    // Definimos uma margem de 10% do intervalo total ou uma constante fixa
     if (min !== null && max !== null) {
-      const rangeSpan = max - min;
-      const margin = rangeSpan * 0.1; // 10% de margem de segurança
-
+      const margin = (max - min) * 0.1;
       if (value <= min + margin || value >= max - margin) {
-        statusReading = StatusReading.ATENCAO;
+        return StatusReading.ATENCAO;
       }
     }
 
@@ -81,31 +80,26 @@ export class SensorReadingService {
   }
 
   async create(createReadingDto: CreateReadingDto) {
+    const reading = new SensorReadingEntity(createReadingDto);
     const sensor = await this.prisma.sensor.findUnique({
-      where: { hardwareId: createReadingDto.hardwareId },
+      where: { id: reading.sensorId },
       include: {
         plant: { include: { idealRanges: true } },
-        readings: { take: 1, orderBy: { createdAt: 'desc' } }, // Adicione isso!
+        readings: { take: 1, orderBy: { createdAt: 'desc' } },
       },
     });
 
-    if (!sensor) {
-      throw new NotFoundException('Sensor não identificado pelo Hardware ID');
-    }
+    if (!sensor) throw new NotFoundException('Sensor não identificado');
 
     let status: StatusReading = StatusReading.NORMAL;
 
-    if (sensor.plant && sensor.plant.idealRanges.length > 0) {
-      status = this.validateReadingAgainstPlant(
-        Number(createReadingDto.value),
-        sensor,
-      );
+    if (sensor.plant) {
+      status = this.validateReadingAgainstPlant(Number(reading.value), sensor);
     }
 
     return this.prisma.sensorReadings.create({
       data: {
-        sensorId: sensor.id,
-        value: createReadingDto.value,
+        ...reading,
         statusReading: status,
       },
     });

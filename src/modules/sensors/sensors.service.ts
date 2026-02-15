@@ -100,15 +100,34 @@ export class SensorsService {
   async create(createSensorDto: CreateSensorDto, userId: number) {
     const sensor = new SensorEntity(createSensorDto);
     if (sensor.plantId) {
-      const existsPlant = await this.prisma.plant.findUnique({
+      const plant = await this.prisma.plant.findUnique({
         where: { id: sensor.plantId },
+        include: { idealRanges: true },
       });
 
-      if (!existsPlant) throw new NotFoundException('planta inexistente');
+      if (!plant) throw new NotFoundException('planta inexistente');
+
+      const idealRange = plant.idealRanges?.find(
+        (r) => r.type.toUpperCase() === sensor.type.toUpperCase(),
+      );
+
+      const unitConflict =
+        (sensor.type === 'TEMPERATURE' && sensor.unit !== plant.tempUnit) ||
+        (sensor.type === 'HUMIDITY' && sensor.unit !== plant.umiUnit) ||
+        (sensor.type === 'PH' && sensor.unit !== plant.phUnit) ||
+        (sensor.type === 'LIGHT' && sensor.unit !== plant.lightUnit) ||
+        (idealRange && idealRange.unit !== sensor.unit);
+
+      if (unitConflict) {
+        throw new BadRequestException(
+          `Conflito de unidades: A unidade do sensor (${sensor.unit}) não coincide com a configuração da planta.`,
+        );
+      }
     }
     const existsHardId = await this.prisma.sensor.findUnique({
       where: { hardwareId: sensor.hardwareId },
     });
+
     if (existsHardId) throw new ConflictException('O Hardware de Id já existe');
 
     const { plantId, ...sensorData } = sensor; // Removemos o plantId do spread
