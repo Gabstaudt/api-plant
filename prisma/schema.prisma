@@ -12,11 +12,10 @@ enum Role {
   VIEWER
 }
 
-enum SensorType {
-  TEMPERATURE
-  HUMIDITY
-  PH
-  LIGHT
+enum StatusReading {
+  NORMAL
+  ATENCAO
+  CRITICO
 }
 
 
@@ -80,12 +79,18 @@ model Sensor{
   id Int @id @default(autoincrement())
   hardwareId String @unique
   sensorName String
-  type SensorType
+  type String
+  unit String
   location String 
   plantId Int?
+
+  alertsEnabled Boolean
+  alertMin Decimal?
+  alertMax Decimal?
+
   readingIntervalSeconds Int?
   notes String?
-  alertsEnabled Boolean
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -97,10 +102,13 @@ model Sensor{
   readings SensorReadings[]
 }
 
+
 model SensorReadings{
   id Int @id @default(autoincrement())
   sensorId Int
   value Decimal
+  statusReading StatusReading
+
   createdAt DateTime @default(now())
 
   sensor Sensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)

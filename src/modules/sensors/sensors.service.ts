@@ -9,12 +9,15 @@ import { UpdateSensorDto } from './dto/update-sensor.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SensorEntity } from './entities/sensor.entity';
 import { SensorStatusResponse } from './entities/statusSensor.interface';
-import { Prisma, SensorType } from '@prisma/client';
-import { equal } from 'assert';
+import { Prisma } from '@prisma/client';
 
 type SensorWithPlant = Prisma.SensorGetPayload<{
   include: {
-    plant: true;
+    plant: {
+      include: {
+        idealRanges: true;
+      };
+    };
     readings: true;
   };
 }>;
@@ -56,19 +59,31 @@ export class SensorsService {
         if (min && val < Number(min)) alerts.push(`${label} baixo: ${val}`);
       };
 
-      switch (sensor.type) {
-        case SensorType.TEMPERATURE:
+      switch (sensor.type.toUpperCase()) {
+        case 'TEMPERATURE':
           check(p.tempMax, p.tempMin, 'Temperatura');
           break;
-        case SensorType.HUMIDITY:
+        case 'HUMIDITY':
           check(p.umiMax, p.umiMin, 'Umidade');
           break;
-        case SensorType.PH:
+        case 'PH':
           check(p.phMax, p.phMin, 'PH');
           break;
-        case SensorType.LIGHT:
+        case 'LIGHT':
           check(p.lightMax, p.lightMin, 'Luminosidade');
           break;
+        default: {
+          const idealRange = sensor.plant.idealRanges?.find(
+            (r) => r.type.toUpperCase() === sensor.type.toUpperCase(),
+          );
+          if (idealRange) {
+            check(
+              Number(idealRange.max),
+              Number(idealRange.min),
+              idealRange.type,
+            );
+          }
+        }
       }
     }
 
@@ -96,19 +111,17 @@ export class SensorsService {
     });
     if (existsHardId) throw new ConflictException('O Hardware de Id já existe');
 
-    return this.prisma.sensor.create({
+    const { plantId, ...sensorData } = sensor; // Removemos o plantId do spread
+
+    const created = await this.prisma.sensor.create({
       data: {
-        hardwareId: sensor.hardwareId,
-        sensorName: sensor.sensorName,
-        type: sensor.type,
-        location: sensor.location,
-        alertsEnabled: sensor.alertsEnabled,
-        readingIntervalSeconds: sensor.readingIntervalSeconds ?? 60,
-        notes: sensor.notes,
-        userId: userId,
-        plantId: sensor.plantId ?? null,
+        ...sensorData,
+        user: { connect: { id: userId } },
+        // Só tenta conectar se o plantId realmente existir
+        ...(plantId && { plant: { connect: { id: plantId } } }),
       },
     });
+    return this.findOne(created.id);
   }
 
   // retorno de todos os sensores, com filtros
@@ -116,7 +129,7 @@ export class SensorsService {
     page?: number;
     limit?: number;
     name?: string;
-    type?: SensorType;
+    type?: string;
     location?: string;
     status?: 'ONLINE' | 'OFFLINE' | 'EM ALERTA';
     plantName?: string;
@@ -132,12 +145,6 @@ export class SensorsService {
       plantName,
       orderBy = 'asc',
     } = query;
-
-    if (type && !Object.values(SensorType).includes(type)) {
-      throw new BadRequestException(
-        `O valor "${type}" não é um tipo de sensor válido. Opções: ${Object.values(SensorType).join(', ')}`,
-      );
-    }
 
     const validStatuses = ['ONLINE', 'OFFLINE', 'EM ALERTA'];
     if (status && !validStatuses.includes(status)) {
@@ -165,7 +172,11 @@ export class SensorsService {
           : undefined,
       },
       include: {
-        plant: true,
+        plant: {
+          include: {
+            idealRanges: true,
+          },
+        },
         readings: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -181,9 +192,14 @@ export class SensorsService {
         type: sensor.type,
         sensorName: sensor.sensorName,
         location: sensor.location,
+        unit: sensor.unit,
         hardwareId: sensor.hardwareId,
         plantName: sensor.plant ? sensor.plant.plantName : undefined,
         status: status,
+        statusReading:
+          sensor.readings.length > 0
+            ? sensor.readings[0].statusReading
+            : undefined,
         updateAt: sensor.updatedAt,
         plantId: sensor.plantId ? sensor.plantId : undefined,
       };
@@ -214,7 +230,11 @@ export class SensorsService {
     const sensor = await this.prisma.sensor.findUnique({
       where: { id },
       include: {
-        plant: true,
+        plant: {
+          include: {
+            idealRanges: true,
+          },
+        },
         readings: {
           orderBy: { createdAt: 'desc' },
           take: 1,
@@ -233,6 +253,7 @@ export class SensorsService {
       sensorName: sensor.sensorName,
       hardwareId: sensor.hardwareId,
       type: sensor.type,
+      unit: sensor.unit,
       location: sensor.location,
       status: status,
       alertMessages: alerts.length > 0 ? alerts : undefined,
@@ -249,17 +270,34 @@ export class SensorsService {
     id: number,
     updateSensorDto: UpdateSensorDto,
   ): Promise<SensorStatusResponse> {
-    const sensor = await this.prisma.sensor.findUnique({ where: { id } });
+    const sensor = await this.prisma.sensor.findFirst({ where: { id } });
     if (!sensor) {
       throw new NotFoundException(`Sensor com ID ${id} não encontrado`);
     }
 
-    await this.prisma.sensor.update({
-      where: { id },
-      data: updateSensorDto,
-    });
+    if (updateSensorDto.plantId) {
+      const plant = await this.prisma.plant.findUnique({
+        where: { id: updateSensorDto.plantId },
+      });
+      if (!plant) throw new NotFoundException('A planta informada não existe.');
+    }
 
-    return this.findOne(id);
+    try {
+      await this.prisma.sensor.update({
+        where: { id },
+        data: updateSensorDto,
+      });
+      return this.findOne(id);
+    } catch (e: any) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError) {
+        if (e.code === 'P2002') {
+          throw new ConflictException(
+            'Este Hardware ID já está em uso por outro sensor.',
+          );
+        }
+      }
+      throw e;
+    }
   }
 
   // exclusão de sensor
@@ -317,17 +355,17 @@ export class SensorsService {
           if (min && val < Number(min)) alerts.push(`${label} baixo: ${val}`);
         };
 
-        switch (sensor.type) {
-          case SensorType.TEMPERATURE:
-            check(p.tempMax, p.tempMin, 'Temperatura');
+        switch (sensor.type.toUpperCase()) {
+          case 'TEMPERATURE':
+            check(p.tempMax, p.tempMin, 'Temperatura (°C)');
             break;
-          case SensorType.HUMIDITY:
+          case 'HUMIDITY':
             check(p.umiMax, p.umiMin, 'Umidade');
             break;
-          case SensorType.PH:
+          case 'PH':
             check(p.phMax, p.phMin, 'PH');
             break;
-          case SensorType.LIGHT:
+          case 'LIGHT':
             check(p.lightMax, p.lightMin, 'Luminosidade');
             break;
         }
@@ -338,6 +376,7 @@ export class SensorsService {
         sensorName: sensor.sensorName,
         hardwareId: sensor.hardwareId,
         type: sensor.type,
+        unit: sensor.unit,
         location: sensor.location,
         alertMessages: alerts.length > 0 ? alerts : undefined,
         status: !isOnline

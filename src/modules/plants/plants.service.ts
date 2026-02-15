@@ -9,7 +9,7 @@ import { UpdatePlantDto } from './dto/update-plant.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PlantEntity } from './entities/plant.entity';
 import { PlantStatusResponse } from './entities/statusPlants.insterface';
-import { Prisma, SensorType } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 type PlantWithSensors = Prisma.PlantGetPayload<{
@@ -52,6 +52,7 @@ export class PlantsService {
       value: Decimal;
     };
 
+    type SensorType = 'TEMPERATURE' | 'LIGHT' | 'PH' | 'HUMIDITY';
     const lastReadingsSensors: Partial<Record<SensorType, SensorReading>> = {};
 
     plant.sensors.forEach((sensor) => {
@@ -86,28 +87,28 @@ export class PlantsService {
           }
         };
         switch (sensor.type) {
-          case SensorType.TEMPERATURE: {
+          case 'TEMPERATURE': {
             check(plant.tempMax, plant.tempMin, 'Temperatura');
             const tempCurrent = lastReading;
-            lastReadingsSensors[SensorType.TEMPERATURE] = tempCurrent;
+            lastReadingsSensors['TEMPERATURE'] = tempCurrent;
             break;
           }
-          case SensorType.HUMIDITY: {
+          case 'HUMIDITY': {
             check(plant.umiMax, plant.umiMin, 'Umidade');
             const umiCurrent = lastReading;
-            lastReadingsSensors[SensorType.HUMIDITY] = umiCurrent;
+            lastReadingsSensors['HUMIDITY'] = umiCurrent;
             break;
           }
-          case SensorType.PH: {
+          case 'PH': {
             check(plant.phMax, plant.phMin, 'pH');
             const phCurrent = lastReading;
-            lastReadingsSensors[SensorType.PH] = phCurrent;
+            lastReadingsSensors['PH'] = phCurrent;
             break;
           }
-          case SensorType.LIGHT: {
+          case 'LIGHT': {
             check(plant.lightMax, plant.lightMin, 'Luz');
             const lightCurrent = lastReading;
-            lastReadingsSensors[SensorType.LIGHT] = lightCurrent;
+            lastReadingsSensors['LIGHT'] = lightCurrent;
             break;
           }
         }
@@ -255,7 +256,7 @@ export class PlantsService {
         lightUnit: plant.lightUnit ?? undefined,
         phUnit: plant.phUnit ?? undefined,
         idealRanges: plant.idealRanges?.map((r) => ({
-              type: r.type,
+          type: r.type,
           unit: r.unit,
           min: r.min ? Number(r.min) : undefined,
           max: r.max ? Number(r.max) : undefined,
@@ -331,7 +332,7 @@ export class PlantsService {
       lightUnit: plant.lightUnit ?? undefined,
       phUnit: plant.phUnit ?? undefined,
       idealRanges: plant.idealRanges?.map((r) => ({
-              type: r.type,
+        type: r.type,
         unit: r.unit,
         min: r.min ? Number(r.min) : undefined,
         max: r.max ? Number(r.max) : undefined,
@@ -427,7 +428,7 @@ export class PlantsService {
         lightUnit: plant.lightUnit ?? undefined,
         phUnit: plant.phUnit ?? undefined,
         idealRanges: plant.idealRanges?.map((r) => ({
-              type: r.type,
+          type: r.type,
           unit: r.unit,
           min: r.min ? Number(r.min) : undefined,
           max: r.max ? Number(r.max) : undefined,
