@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { CreatePlantDto } from './dto/create-plant.dto';
 import { UpdatePlantDto } from './dto/update-plant.dto';
@@ -121,6 +122,15 @@ export class PlantsService {
 
   // criação de uma planta, conectando a um usuário
   async create(createPlantDto: CreatePlantDto, userId: number) {
+    if (!userId) {
+      throw new UnauthorizedException('Usuário não autenticado');
+    }
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+
     const plant = new PlantEntity(createPlantDto);
 
     const checkLimits = (max: any, min: any, label: string) => {
@@ -135,7 +145,7 @@ export class PlantsService {
     checkLimits(plant.tempMax, plant.tempMin, 'temperatura');
     checkLimits(plant.umiMax, plant.umiMin, 'umidade');
     checkLimits(plant.lightMax, plant.lightMin, 'luminosidade');
-    return this.prisma.plant.create({
+    const created = await this.prisma.plant.create({
       data: {
         ...plant,
         user: {
@@ -143,6 +153,7 @@ export class PlantsService {
         },
       },
     });
+    return this.findOne(created.id);
   }
 
   //retorno de todas as plantas(com filtros)
@@ -318,8 +329,6 @@ export class PlantsService {
 
   //retorno de Status de planta
   async getStatusPlants(): Promise<{ data: PlantStatusResponse[] }> {
-    const now = new Date();
-
     const plants = await this.prisma.plant.findMany({
       include: {
         sensors: {
