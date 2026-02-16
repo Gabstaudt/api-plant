@@ -55,6 +55,11 @@ export class PlantsController {
     return await this.plantsService.getStatusPlants();
   }
 
+  @Get('options')
+  async getPlantOptions() {
+    return this.plantsService.getOptions();
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<PlantStatusResponse> {
     return this.plantsService.findOne(+id);
