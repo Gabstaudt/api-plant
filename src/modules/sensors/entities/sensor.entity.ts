@@ -1,10 +1,12 @@
-import { SensorType } from '@prisma/client';
-
 export class SensorEntity {
   hardwareId!: string;
   sensorName!: string;
-  type!: SensorType;
+  type!: string;
+  unit!: string;
   location!: string;
+
+  alertMax?: number;
+  alertMin?: number;
   alertsEnabled!: boolean;
   plantId?: number;
   readingIntervalSeconds?: number;

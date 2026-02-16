@@ -19,7 +19,6 @@ import { AuthGuard } from '@nestjs/passport';
 import { CreateReadingDto } from './dto/create-reading.dto';
 import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { SensorReadingService } from './sensorReadings.service';
-import { SensorType } from '@prisma/client';
 import { SensorStatusResponse } from './entities/statusSensor.interface';
 
 @UseGuards(AuthGuard('jwt'))
@@ -49,7 +48,7 @@ export class SensorsController {
     @Query('limit') limit?: number,
     @Query('name') name?: string,
     @Query('status') status?: 'ONLINE' | 'OFFLINE' | 'EM ALERTA',
-    @Query('type') type?: SensorType,
+    @Query('type') type?: string,
     @Query('location') location?: string,
     @Query('plantName') plantName?: string,
     @Query('orderBy') orderBy?: 'asc' | 'desc',

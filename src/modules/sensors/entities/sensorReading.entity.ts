@@ -1,5 +1,5 @@
 export class SensorReadingEntity {
-  hardwareId!: string;
+  sensorId!: number;
   value!: number;
 
   constructor(partial: Partial<SensorReadingEntity>) {
