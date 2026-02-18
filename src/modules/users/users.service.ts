@@ -2,7 +2,17 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdateUserDto } from '../dto/update-user.dto';
 
-const userSelect = { id:true, fullName:true, email:true, role:true, dateOfBirth:true, createdAt:true };
+const userSelect = {
+  id: true,
+  fullName: true,
+  email: true,
+  role: true,
+  status: true,
+  dateOfBirth: true,
+  lastLoginAt: true,
+  ecosystemId: true,
+  createdAt: true,
+};
 
 @Injectable()
 export class UsersService {
@@ -31,6 +41,7 @@ export class UsersService {
         fullName: dto.fullName,
         email: dto.email,
         role: dto.role,
+        status: dto.status,
         dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
       },
       select: userSelect,

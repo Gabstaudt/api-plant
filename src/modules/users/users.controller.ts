@@ -30,25 +30,25 @@ export class UsersController {
   }
 
   // ADMIN
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'ADMIN_MASTER')
   @Get()
   findAll() {
     return this.service.findAll();
   }
 
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'ADMIN_MASTER')
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.service.findOne(id);
   }
 
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'ADMIN_MASTER')
   @Patch(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateUserDto) {
     return this.service.update(id, body);
   }
 
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'ADMIN_MASTER')
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);

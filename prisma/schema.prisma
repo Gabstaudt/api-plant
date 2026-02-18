@@ -8,8 +8,15 @@ datasource db {
 }
 
 enum Role {
+  ADMIN_MASTER
   ADMIN
   VIEWER
+}
+
+enum UserStatus {
+  ATIVO
+  PENDENTE
+  BLOQUEADO
 }
 
 enum StatusReading {
@@ -44,8 +51,14 @@ model User {
   email        String    @unique
   password     String
   role         Role      @default(VIEWER)
+  status       UserStatus @default(PENDENTE)
+  requestedRole Role?
   dateOfBirth  DateTime?
+  lastLoginAt  DateTime?
   createdAt    DateTime  @default(now())
+
+  ecosystemId Int?
+  ecosystem Ecosystem? @relation(fields: [ecosystemId], references: [id], onDelete: SetNull)
 
   plants Plant[]
   sensors Sensor[]
@@ -53,6 +66,16 @@ model User {
   resolvedAlerts Alert[] @relation("AlertResolvedBy")
   alerts Alert[]
   alertEvents AlertEvent[]
+}
+
+model Ecosystem {
+  id Int @id @default(autoincrement())
+  name String
+  code String @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
 }
 
 model Plant {
