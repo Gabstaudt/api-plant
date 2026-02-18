@@ -18,6 +18,20 @@ enum StatusReading {
   CRITICO
 }
 
+enum AlertSeverity {
+  CRITICO
+  MEDIO
+  BAIXO
+}
+
+enum AlertCondition {
+  ABOVE_IDEAL
+  BELOW_IDEAL
+  EQUALS
+  GREATER_THAN
+  LESS_THAN
+}
+
 
 model User {
   id           Int       @id @default(autoincrement())
@@ -30,6 +44,7 @@ model User {
 
   plants Plant[]
   sensors Sensor[]
+  alertRules AlertRule[]
 }
 
 model Plant {
@@ -100,6 +115,8 @@ model Sensor{
   user User @relation(fields: [userId], references: [id])
 
   readings SensorReadings[]
+
+  alertRules SensorAlertRule[]
 }
 
 
@@ -112,5 +129,34 @@ model SensorReadings{
   createdAt DateTime @default(now())
 
   sensor Sensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+}
+
+model AlertRule {
+  id Int @id @default(autoincrement())
+  name String
+  measurementType String
+  unit String?
+  condition AlertCondition
+  threshold Decimal?
+  severity AlertSeverity
+  enabled Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+
+  sensors SensorAlertRule[]
+}
+
+model SensorAlertRule {
+  id Int @id @default(autoincrement())
+  sensorId Int
+  alertRuleId Int
+
+  sensor Sensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+  alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+
+  @@unique([sensorId, alertRuleId])
 }
 
