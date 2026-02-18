@@ -18,6 +18,25 @@ enum StatusReading {
   CRITICO
 }
 
+enum AlertSeverity {
+  CRITICO
+  MEDIO
+  BAIXO
+}
+
+enum AlertCondition {
+  ABOVE_IDEAL
+  BELOW_IDEAL
+  EQUALS
+  GREATER_THAN
+  LESS_THAN
+}
+
+enum AlertStatus {
+  ATIVO
+  RESOLVIDO
+}
+
 
 model User {
   id           Int       @id @default(autoincrement())
@@ -30,6 +49,10 @@ model User {
 
   plants Plant[]
   sensors Sensor[]
+  alertRules AlertRule[]
+  resolvedAlerts Alert[] @relation("AlertResolvedBy")
+  alerts Alert[]
+  alertEvents AlertEvent[]
 }
 
 model Plant {
@@ -59,6 +82,7 @@ model Plant {
 
   sensors Sensor[]
   idealRanges PlantIdealRange[]
+  alerts Alert[]
 }
 
 model PlantIdealRange {
@@ -100,6 +124,9 @@ model Sensor{
   user User @relation(fields: [userId], references: [id])
 
   readings SensorReadings[]
+
+  alertRules SensorAlertRule[]
+  alerts Alert[]
 }
 
 
@@ -112,5 +139,81 @@ model SensorReadings{
   createdAt DateTime @default(now())
 
   sensor Sensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+}
+
+model AlertRule {
+  id Int @id @default(autoincrement())
+  name String
+  measurementType String
+  unit String?
+  condition AlertCondition
+  threshold Decimal?
+  severity AlertSeverity
+  enabled Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+
+  sensors SensorAlertRule[]
+  alerts Alert[]
+}
+
+model SensorAlertRule {
+  id Int @id @default(autoincrement())
+  sensorId Int
+  alertRuleId Int
+
+  sensor Sensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+  alertRule AlertRule @relation(fields: [alertRuleId], references: [id], onDelete: Cascade)
+
+  @@unique([sensorId, alertRuleId])
+}
+
+model Alert {
+  id Int @id @default(autoincrement())
+  title String
+  description String
+  status AlertStatus @default(ATIVO)
+  severity AlertSeverity
+  value Decimal?
+  unit String?
+  firedAt DateTime @default(now())
+  resolvedAt DateTime?
+  resolvedComment String?
+
+  userId Int
+  user User @relation(fields: [userId], references: [id])
+
+  plantId Int?
+  plant Plant? @relation(fields: [plantId], references: [id], onDelete: SetNull)
+
+  sensorId Int
+  sensor Sensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+
+  alertRuleId Int?
+  alertRule AlertRule? @relation(fields: [alertRuleId], references: [id], onDelete: SetNull)
+
+  resolvedById Int?
+  resolvedBy User? @relation("AlertResolvedBy", fields: [resolvedById], references: [id])
+
+  events AlertEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AlertEvent {
+  id Int @id @default(autoincrement())
+  alertId Int
+  title String
+  message String?
+  createdAt DateTime @default(now())
+
+  userId Int?
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  alert Alert @relation(fields: [alertId], references: [id], onDelete: Cascade)
 }
 
