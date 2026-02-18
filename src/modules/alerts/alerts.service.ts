@@ -7,6 +7,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateAlertRuleDto } from './dto/create-alert-rule.dto';
 import { UpdateAlertRuleDto } from './dto/update-alert-rule.dto';
 import { AlertRuleResponse } from './entities/alertRule.interface';
+import { AlertResponse } from './entities/alert.interface';
+import { ResolveAlertDto } from './dto/resolve-alert.dto';
 
 @Injectable()
 export class AlertsService {
@@ -25,6 +27,54 @@ export class AlertsService {
       sensorIds: rule.sensors?.map((s: any) => s.sensorId) ?? [],
       createdAt: rule.createdAt,
       updatedAt: rule.updatedAt,
+    };
+  }
+
+  private mapAlert(alert: any): AlertResponse {
+    return {
+      id: alert.id,
+      title: alert.title,
+      description: alert.description,
+      status: alert.status,
+      severity: alert.severity,
+      value: alert.value ? Number(alert.value) : undefined,
+      unit: alert.unit ?? undefined,
+      firedAt: alert.firedAt,
+      resolvedAt: alert.resolvedAt ?? undefined,
+      resolvedComment: alert.resolvedComment ?? undefined,
+      resolvedBy: alert.resolvedBy
+        ? { id: alert.resolvedBy.id, name: alert.resolvedBy.fullName }
+        : null,
+      plant: alert.plant
+        ? {
+            id: alert.plant.id,
+            name: alert.plant.plantName,
+            location: alert.plant.location,
+          }
+        : null,
+      sensor: {
+        id: alert.sensor.id,
+        name: alert.sensor.sensorName,
+        code: alert.sensor.hardwareId,
+        type: alert.sensor.type,
+      },
+      rule: alert.alertRule
+        ? {
+            id: alert.alertRule.id,
+            name: alert.alertRule.name,
+            detail: alert.alertRule.condition
+              ? `${alert.alertRule.condition}`
+              : undefined,
+          }
+        : null,
+      events:
+        alert.events?.map((e: any) => ({
+          id: e.id,
+          title: e.title,
+          message: e.message ?? undefined,
+          at: e.createdAt,
+          by: e.user?.fullName ?? undefined,
+        })) ?? [],
     };
   }
 
@@ -145,5 +195,72 @@ export class AlertsService {
     if (!existing) throw new NotFoundException('Regra não encontrada.');
     await this.prisma.alertRule.delete({ where: { id } });
     return { message: `Regra ${id} removida com sucesso` };
+  }
+
+  async listAlerts(userId: number): Promise<{ data: AlertResponse[] }> {
+    const alerts = await this.prisma.alert.findMany({
+      where: { userId },
+      include: {
+        plant: true,
+        sensor: true,
+        alertRule: true,
+        resolvedBy: true,
+      },
+      orderBy: { firedAt: 'desc' },
+    });
+    return { data: alerts.map((a) => this.mapAlert(a)) };
+  }
+
+  async getAlert(id: number, userId: number): Promise<AlertResponse> {
+    const alert = await this.prisma.alert.findFirst({
+      where: { id, userId },
+      include: {
+        plant: true,
+        sensor: true,
+        alertRule: true,
+        resolvedBy: true,
+        events: { include: { user: true }, orderBy: { createdAt: 'desc' } },
+      },
+    });
+    if (!alert) throw new NotFoundException('Alerta não encontrado.');
+    return this.mapAlert(alert);
+  }
+
+  async resolveAlert(
+    id: number,
+    dto: ResolveAlertDto,
+    userId: number,
+  ): Promise<AlertResponse> {
+    const alert = await this.prisma.alert.findFirst({
+      where: { id, userId },
+      include: { events: true },
+    });
+    if (!alert) throw new NotFoundException('Alerta não encontrado.');
+
+    const updated = await this.prisma.alert.update({
+      where: { id },
+      data: {
+        status: 'RESOLVIDO',
+        resolvedAt: new Date(),
+        resolvedComment: dto.comment,
+        resolvedBy: { connect: { id: userId } },
+        events: {
+          create: {
+            title: 'Alerta resolvido',
+            message: dto.comment,
+            user: { connect: { id: userId } },
+          },
+        },
+      },
+      include: {
+        plant: true,
+        sensor: true,
+        alertRule: true,
+        resolvedBy: true,
+        events: { include: { user: true }, orderBy: { createdAt: 'desc' } },
+      },
+    });
+
+    return this.mapAlert(updated);
   }
 }

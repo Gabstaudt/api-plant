@@ -13,6 +13,7 @@ import { CurrentUser } from 'src/common/decorators/current-user.decorator';
 import { AlertsService } from './alerts.service';
 import { CreateAlertRuleDto } from './dto/create-alert-rule.dto';
 import { UpdateAlertRuleDto } from './dto/update-alert-rule.dto';
+import { ResolveAlertDto } from './dto/resolve-alert.dto';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('alerts')
@@ -55,5 +56,27 @@ export class AlertsController {
     @CurrentUser() user: { userId: number },
   ) {
     return this.alertsService.remove(+id, user.userId);
+  }
+
+  @Get()
+  listAlerts(@CurrentUser() user: { userId: number }) {
+    return this.alertsService.listAlerts(user.userId);
+  }
+
+  @Get(':id')
+  getAlert(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.alertsService.getAlert(+id, user.userId);
+  }
+
+  @Post(':id/resolve')
+  resolveAlert(
+    @Param('id') id: string,
+    @Body() dto: ResolveAlertDto,
+    @CurrentUser() user: { userId: number },
+  ) {
+    return this.alertsService.resolveAlert(+id, dto, user.userId);
   }
 }
