@@ -219,8 +219,18 @@ export class SensorsService {
           sensor.readings.length > 0
             ? sensor.readings[0].statusReading
             : undefined,
+        lastReading:
+          sensor.readings.length > 0
+            ? Number(sensor.readings[0].value)
+            : undefined,
+        lastReadingAt:
+          sensor.readings.length > 0 ? sensor.readings[0].createdAt : undefined,
         updateAt: sensor.updatedAt,
         plantId: sensor.plantId ? sensor.plantId : undefined,
+        alertsEnabled: sensor.alertsEnabled,
+        readingIntervalSeconds: sensor.readingIntervalSeconds ?? undefined,
+        createdAt: sensor.createdAt,
+        updatedAt: sensor.updatedAt,
       };
 
       return this.removeNulls<SensorStatusResponse>(sensorData);
@@ -277,8 +287,16 @@ export class SensorsService {
       status: status,
       alertMessages: alerts.length > 0 ? alerts : undefined,
       lastReading: lastReadingValue,
+      lastReadingAt: sensor.readings[0]?.createdAt,
+      statusReading: sensor.readings[0]?.statusReading,
       notes: sensor.notes ? sensor.notes : undefined,
       plantName: sensor.plant?.plantName,
+      plantId: sensor.plantId ? sensor.plantId : undefined,
+      alertsEnabled: sensor.alertsEnabled,
+      readingIntervalSeconds: sensor.readingIntervalSeconds ?? undefined,
+      updateAt: sensor.updatedAt,
+      createdAt: sensor.createdAt,
+      updatedAt: sensor.updatedAt,
     };
 
     return this.removeNulls<SensorStatusResponse>(sensorData);
