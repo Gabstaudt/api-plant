@@ -11,8 +11,13 @@ export interface SensorStatusResponse {
   statusReading?: StatusReading;
   alertMessages?: string[];
   lastReading?: number;
+  lastReadingAt?: Date;
   notes?: string;
   plantName?: string;
   plantId?: number;
+  alertsEnabled?: boolean;
+  readingIntervalSeconds?: number;
   updateAt?: Date;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
