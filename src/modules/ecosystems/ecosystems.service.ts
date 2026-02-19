@@ -90,4 +90,26 @@ export class EcosystemsService {
       select: userSelect,
     });
   }
+
+  async updateUserRole(adminId: number, targetUserId: number, role: 'ADMIN' | 'VIEWER') {
+    const ecosystemId = await this.getUserEcosystem(adminId);
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, ecosystemId: true, status: true, role: true },
+    });
+    if (!user || user.ecosystemId !== ecosystemId) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+    if (user.status !== 'ATIVO') {
+      throw new BadRequestException('Usuário não está ativo');
+    }
+    if (user.role === 'ADMIN_MASTER') {
+      throw new BadRequestException('Não é possível alterar o administrador master');
+    }
+    return this.prisma.user.update({
+      where: { id: targetUserId },
+      data: { role },
+      select: userSelect,
+    });
+  }
 }

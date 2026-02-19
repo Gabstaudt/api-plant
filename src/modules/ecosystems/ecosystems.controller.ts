@@ -6,6 +6,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { EcosystemsService } from './ecosystems.service';
 import { ApproveRequestDto } from './dto/approve-request.dto';
+import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 
 @ApiTags('ecosystems')
 @ApiBearerAuth()
@@ -45,5 +46,15 @@ export class EcosystemsController {
   @Patch('requests/:id/reject')
   reject(@CurrentUser() user: { userId: number }, @Param('id', ParseIntPipe) id: number) {
     return this.service.rejectRequest(user.userId, id);
+  }
+
+  @Roles('ADMIN', 'ADMIN_MASTER')
+  @Patch('users/:id/role')
+  updateRole(
+    @CurrentUser() user: { userId: number },
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: UpdateUserRoleDto,
+  ) {
+    return this.service.updateUserRole(user.userId, id, body.role);
   }
 }
