@@ -76,6 +76,18 @@ model Ecosystem {
   updatedAt DateTime @updatedAt
 
   users User[]
+  profiles RoleProfile[]
+}
+
+model RoleProfile {
+  id Int @id @default(autoincrement())
+  name String
+  permissions String[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ecosystemId Int
+  ecosystem Ecosystem @relation(fields: [ecosystemId], references: [id], onDelete: Cascade)
 }
 
 model Plant {
