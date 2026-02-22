@@ -4,6 +4,7 @@ import { AuthGuard } from '@nestjs/passport';
 
 import { UsersService } from './users.service';
 import { UpdateUserDto } from '../dto/update-user.dto';
+import { ChangePasswordDto } from '../dto/change-password.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -27,6 +28,11 @@ export class UsersController {
       email: body.email,
       dateOfBirth: body.dateOfBirth,
     });
+  }
+
+  @Patch('me/password')
+  changeMyPassword(@CurrentUser() user: { userId: number }, @Body() body: ChangePasswordDto) {
+    return this.service.changePassword(user.userId, body);
   }
 
   // ADMIN
