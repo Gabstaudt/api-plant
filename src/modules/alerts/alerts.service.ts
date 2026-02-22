@@ -14,6 +14,17 @@ import { ResolveAlertDto } from './dto/resolve-alert.dto';
 export class AlertsService {
   constructor(private prisma: PrismaService) {}
 
+  private async getEcosystemId(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { ecosystemId: true },
+    });
+    if (!user?.ecosystemId) {
+      throw new NotFoundException('Usuário sem ecossistema');
+    }
+    return user.ecosystemId;
+  }
+
   private mapRule(rule: any): AlertRuleResponse {
     return {
       id: rule.id,
@@ -79,10 +90,11 @@ export class AlertsService {
   }
 
   async create(dto: CreateAlertRuleDto, userId: number): Promise<AlertRuleResponse> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const sensorIds = dto.sensorIds ?? [];
     if (sensorIds.length) {
       const sensors = await this.prisma.sensor.findMany({
-        where: { id: { in: sensorIds }, userId },
+        where: { id: { in: sensorIds }, user: { ecosystemId } },
         select: { id: true },
       });
       if (sensors.length !== sensorIds.length) {
@@ -124,8 +136,9 @@ export class AlertsService {
   }
 
   async findAll(userId: number): Promise<{ data: AlertRuleResponse[] }> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const rules = await this.prisma.alertRule.findMany({
-      where: { userId },
+      where: { user: { ecosystemId } },
       include: { sensors: true },
       orderBy: { createdAt: 'desc' },
     });
@@ -133,8 +146,9 @@ export class AlertsService {
   }
 
   async findOne(id: number, userId: number): Promise<AlertRuleResponse> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const rule = await this.prisma.alertRule.findFirst({
-      where: { id, userId },
+      where: { id, user: { ecosystemId } },
       include: { sensors: true },
     });
     if (!rule) throw new NotFoundException('Regra não encontrada.');
@@ -146,8 +160,9 @@ export class AlertsService {
     dto: UpdateAlertRuleDto,
     userId: number,
   ): Promise<AlertRuleResponse> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const existing = await this.prisma.alertRule.findFirst({
-      where: { id, userId },
+      where: { id, user: { ecosystemId } },
       include: { sensors: true },
     });
     if (!existing) throw new NotFoundException('Regra não encontrada.');
@@ -155,7 +170,7 @@ export class AlertsService {
     const sensorIds = dto.sensorIds;
     if (sensorIds && sensorIds.length) {
       const sensors = await this.prisma.sensor.findMany({
-        where: { id: { in: sensorIds }, userId },
+        where: { id: { in: sensorIds }, user: { ecosystemId } },
         select: { id: true },
       });
       if (sensors.length !== sensorIds.length) {
@@ -189,8 +204,9 @@ export class AlertsService {
   }
 
   async remove(id: number, userId: number) {
+    const ecosystemId = await this.getEcosystemId(userId);
     const existing = await this.prisma.alertRule.findFirst({
-      where: { id, userId },
+      where: { id, user: { ecosystemId } },
     });
     if (!existing) throw new NotFoundException('Regra não encontrada.');
     await this.prisma.alertRule.delete({ where: { id } });
@@ -198,8 +214,9 @@ export class AlertsService {
   }
 
   async listAlerts(userId: number): Promise<{ data: AlertResponse[] }> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const alerts = await this.prisma.alert.findMany({
-      where: { userId },
+      where: { user: { ecosystemId } },
       include: {
         plant: true,
         sensor: true,
@@ -212,8 +229,9 @@ export class AlertsService {
   }
 
   async getAlert(id: number, userId: number): Promise<AlertResponse> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const alert = await this.prisma.alert.findFirst({
-      where: { id, userId },
+      where: { id, user: { ecosystemId } },
       include: {
         plant: true,
         sensor: true,
@@ -231,8 +249,9 @@ export class AlertsService {
     dto: ResolveAlertDto,
     userId: number,
   ): Promise<AlertResponse> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const alert = await this.prisma.alert.findFirst({
-      where: { id, userId },
+      where: { id, user: { ecosystemId } },
       include: { events: true },
     });
     if (!alert) throw new NotFoundException('Alerta não encontrado.');
