@@ -39,7 +39,7 @@ export class EcosystemsService {
   async listUsers(userId: number) {
     const ecosystemId = await this.getUserEcosystem(userId);
     return this.prisma.user.findMany({
-      where: { ecosystemId, NOT: { status: 'PENDENTE' } },
+      where: { ecosystemId, NOT: [{ status: 'PENDENTE' }, { status: 'DELETADO' }] },
       select: userSelect,
       orderBy: { createdAt: 'desc' },
     });
@@ -209,5 +209,50 @@ export class EcosystemsService {
       data: { roleProfileId },
       select: userSelect,
     });
+  }
+
+  async updateUserStatus(
+    adminId: number,
+    targetUserId: number,
+    status: 'ATIVO' | 'BLOQUEADO',
+  ) {
+    const ecosystemId = await this.getUserEcosystem(adminId);
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, ecosystemId: true, role: true, status: true },
+    });
+    if (!user || user.ecosystemId !== ecosystemId) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+    if (user.role === 'ADMIN_MASTER') {
+      throw new BadRequestException('Não é possível alterar o administrador master');
+    }
+    if (user.status === 'DELETADO') {
+      throw new BadRequestException('Usuário excluído');
+    }
+    return this.prisma.user.update({
+      where: { id: targetUserId },
+      data: { status },
+      select: userSelect,
+    });
+  }
+
+  async deleteUser(adminId: number, targetUserId: number) {
+    const ecosystemId = await this.getUserEcosystem(adminId);
+    const user = await this.prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, ecosystemId: true, role: true },
+    });
+    if (!user || user.ecosystemId !== ecosystemId) {
+      throw new NotFoundException('Usuário não encontrado');
+    }
+    if (user.role === 'ADMIN_MASTER') {
+      throw new BadRequestException('Não é possível excluir o administrador master');
+    }
+    await this.prisma.user.update({
+      where: { id: targetUserId },
+      data: { status: 'DELETADO' },
+    });
+    return { deleted: true };
   }
 }

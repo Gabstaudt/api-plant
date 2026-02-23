@@ -17,6 +17,7 @@ enum UserStatus {
   ATIVO
   PENDENTE
   BLOQUEADO
+  DELETADO
 }
 
 enum StatusReading {

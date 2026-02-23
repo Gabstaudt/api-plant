@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -68,5 +68,24 @@ export class EcosystemsController {
     const roleProfileId =
       body.roleProfileId === undefined ? null : body.roleProfileId;
     return this.service.updateUserProfile(user.userId, id, roleProfileId);
+  }
+
+  @Roles('ADMIN', 'ADMIN_MASTER')
+  @Patch('users/:id/status')
+  updateStatus(
+    @CurrentUser() user: { userId: number },
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { status?: 'ATIVO' | 'BLOQUEADO' },
+  ) {
+    if (!body.status) {
+      return this.service.updateUserStatus(user.userId, id, 'BLOQUEADO');
+    }
+    return this.service.updateUserStatus(user.userId, id, body.status);
+  }
+
+  @Roles('ADMIN', 'ADMIN_MASTER')
+  @Delete('users/:id')
+  removeUser(@CurrentUser() user: { userId: number }, @Param('id', ParseIntPipe) id: number) {
+    return this.service.deleteUser(user.userId, id);
   }
 }
