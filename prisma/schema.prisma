@@ -59,6 +59,8 @@ model User {
 
   ecosystemId Int?
   ecosystem Ecosystem? @relation(fields: [ecosystemId], references: [id], onDelete: SetNull)
+  roleProfileId Int?
+  roleProfile RoleProfile? @relation(fields: [roleProfileId], references: [id], onDelete: SetNull)
 
   plants Plant[]
   sensors Sensor[]
@@ -83,11 +85,14 @@ model RoleProfile {
   id Int @id @default(autoincrement())
   name String
   permissions String[]
+  isDefault Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   ecosystemId Int
   ecosystem Ecosystem @relation(fields: [ecosystemId], references: [id], onDelete: Cascade)
+
+  users User[]
 }
 
 model Plant {

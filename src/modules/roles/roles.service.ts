@@ -36,6 +36,7 @@ export class RolesService {
       data: {
         name: dto.name.trim(),
         permissions: dto.permissions ?? [],
+        isDefault: false,
         ecosystem: { connect: { id: ecosystemId } },
       },
     });

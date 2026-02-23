@@ -57,4 +57,16 @@ export class EcosystemsController {
   ) {
     return this.service.updateUserRole(user.userId, id, body.role);
   }
+
+  @Roles('ADMIN', 'ADMIN_MASTER')
+  @Patch('users/:id/profile')
+  updateProfile(
+    @CurrentUser() user: { userId: number },
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { roleProfileId?: number | null },
+  ) {
+    const roleProfileId =
+      body.roleProfileId === undefined ? null : body.roleProfileId;
+    return this.service.updateUserProfile(user.userId, id, roleProfileId);
+  }
 }

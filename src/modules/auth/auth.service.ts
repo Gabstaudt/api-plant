@@ -32,6 +32,57 @@ export class AuthService {
         const ecosystem = await tx.ecosystem.create({
           data: { name: dto.ecosystemName!.trim(), code },
         });
+        await tx.roleProfile.createMany({
+          data: [
+            {
+              name: 'Usuário',
+              isDefault: true,
+              permissions: [
+                'nav:dashboard',
+                'nav:plants',
+                'nav:sensors',
+                'nav:alerts',
+                'plants:view:details',
+                'sensors:view:readings',
+                'alerts:view:details',
+                'settings:view',
+              ],
+              ecosystemId: ecosystem.id,
+            },
+            {
+              name: 'Administrador',
+              isDefault: false,
+              permissions: [
+                'nav:dashboard',
+                'nav:plants',
+                'nav:sensors',
+                'nav:alerts',
+                'nav:reports',
+                'nav:users',
+                'nav:settings',
+                'plants:create',
+                'plants:update',
+                'plants:delete',
+                'plants:view:details',
+                'sensors:create',
+                'sensors:update',
+                'sensors:delete',
+                'sensors:view:readings',
+                'sensors:view:settings',
+                'alerts:manage',
+                'alerts:resolve',
+                'alerts:view:details',
+                'reports:view',
+                'reports:export',
+                'users:manage',
+                'users:roles',
+                'settings:view',
+                'settings:update',
+              ],
+              ecosystemId: ecosystem.id,
+            },
+          ],
+        });
         return tx.user.create({
           data: {
             fullName: dto.fullName,
