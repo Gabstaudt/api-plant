@@ -25,9 +25,9 @@ export class CreateSensorDto {
   type!: string;
 
   @ApiProperty()
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  location!: string;
+  location?: string;
 
   @ApiProperty()
   @IsNotEmpty()

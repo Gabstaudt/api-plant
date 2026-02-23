@@ -27,6 +27,17 @@ type PlantWithSensors = Prisma.PlantGetPayload<{
 export class PlantsService {
   constructor(private prisma: PrismaService) {}
 
+  private async getEcosystemId(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { ecosystemId: true },
+    });
+    if (!user?.ecosystemId) {
+      throw new UnauthorizedException('Usuário sem ecossistema');
+    }
+    return user.ecosystemId;
+  }
+
   //método para remover nulos(usado em getters)
   private removeNulls<T>(obj: any): T {
     Object.keys(obj).forEach((key) => {
@@ -132,6 +143,9 @@ export class PlantsService {
     if (!user) {
       throw new NotFoundException('Usuário não encontrado');
     }
+    if (!user.ecosystemId) {
+      throw new UnauthorizedException('Usuário sem ecossistema');
+    }
 
     const plant = new PlantEntity(createPlantDto);
     const idealRanges = createPlantDto.idealRanges ?? [];
@@ -184,11 +198,12 @@ export class PlantsService {
           : undefined,
       },
     });
-    return this.findOne(created.id);
+    return this.findOne(created.id, userId);
   }
 
   //retorno de todas as plantas(com filtros)
   async findAll(query: {
+    userId: number;
     page?: number;
     limit?: number;
     name?: string;
@@ -198,6 +213,7 @@ export class PlantsService {
     orderBy?: 'asc' | 'desc';
   }) {
     const {
+      userId,
       page = 1,
       limit = 10,
       name,
@@ -221,8 +237,10 @@ export class PlantsService {
       );
     }
 
+    const ecosystemId = await this.getEcosystemId(userId);
     const plants = await this.prisma.plant.findMany({
       where: {
+        user: { ecosystemId },
         plantName: name ? { contains: name, mode: 'insensitive' } : undefined,
         species: species
           ? { contains: species, mode: 'insensitive' }
@@ -300,7 +318,8 @@ export class PlantsService {
   }
 
   //Detalhes de uma única planta
-  async findOne(id: number): Promise<PlantStatusResponse> {
+  async findOne(id: number, userId: number): Promise<PlantStatusResponse> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const plant = await this.prisma.plant.findUnique({
       where: { id },
       include: {
@@ -317,6 +336,13 @@ export class PlantsService {
     });
 
     if (!plant) {
+      throw new NotFoundException(`Planta com ID ${id} não encontrada`);
+    }
+    const owner = await this.prisma.user.findUnique({
+      where: { id: plant.userId },
+      select: { ecosystemId: true },
+    });
+    if (!owner || owner.ecosystemId !== ecosystemId) {
       throw new NotFoundException(`Planta com ID ${id} não encontrada`);
     }
 
@@ -356,10 +382,18 @@ export class PlantsService {
     return this.removeNulls<PlantStatusResponse>(result);
   }
 
-  async update(id: number, updatePlantDto: UpdatePlantDto) {
+  async update(id: number, updatePlantDto: UpdatePlantDto, userId: number) {
+    const ecosystemId = await this.getEcosystemId(userId);
     const plant = await this.prisma.plant.findUnique({ where: { id } });
     if (!plant)
       throw new NotFoundException('Planta não encontrada no banco de dados');
+    const owner = await this.prisma.user.findUnique({
+      where: { id: plant.userId },
+      select: { ecosystemId: true },
+    });
+    if (!owner || owner.ecosystemId !== ecosystemId) {
+      throw new NotFoundException('Planta não encontrada no banco de dados');
+    }
 
     const idealRanges = updatePlantDto.idealRanges ?? [];
     const legacyFromRanges = pickLegacyFromRanges(idealRanges);
@@ -385,14 +419,22 @@ export class PlantsService {
       },
     });
 
-    return this.findOne(id);
+    return this.findOne(id, userId);
   }
 
   // Exclusão de planta
-  async remove(id: number): Promise<void> {
+  async remove(id: number, userId: number): Promise<void> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const plant = await this.prisma.plant.findUnique({ where: { id } });
     if (!plant)
       throw new NotFoundException('Planta não encontrada no banco de dados');
+    const owner = await this.prisma.user.findUnique({
+      where: { id: plant.userId },
+      select: { ecosystemId: true },
+    });
+    if (!owner || owner.ecosystemId !== ecosystemId) {
+      throw new NotFoundException('Planta não encontrada no banco de dados');
+    }
 
     await this.prisma.plant.delete({
       where: { id },
@@ -400,8 +442,10 @@ export class PlantsService {
   }
 
   //retorno de Status de planta
-  async getStatusPlants(): Promise<{ data: PlantStatusResponse[] }> {
+  async getStatusPlants(userId: number): Promise<{ data: PlantStatusResponse[] }> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const plants = await this.prisma.plant.findMany({
+      where: { user: { ecosystemId } },
       include: {
         sensors: {
           include: {
@@ -455,19 +499,23 @@ export class PlantsService {
     return { data: result };
   }
 
-  async getOptions() {
+  async getOptions(userId: number) {
+    const ecosystemId = await this.getEcosystemId(userId);
     const [species, locations, units] = await Promise.all([
       this.prisma.plant.findMany({
+        where: { user: { ecosystemId } },
         distinct: ['species'],
         select: { species: true },
         orderBy: { species: 'asc' },
       }),
       this.prisma.plant.findMany({
+        where: { user: { ecosystemId } },
         distinct: ['location'],
         select: { location: true },
         orderBy: { location: 'asc' },
       }),
       this.prisma.plantIdealRange.findMany({
+        where: { plant: { user: { ecosystemId } } },
         distinct: ['type', 'unit'],
         select: { type: true, unit: true },
         orderBy: [{ type: 'asc' }, { unit: 'asc' }],

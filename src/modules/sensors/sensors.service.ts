@@ -26,6 +26,17 @@ type SensorWithPlant = Prisma.SensorGetPayload<{
 export class SensorsService {
   constructor(private prisma: PrismaService) {}
 
+  private async getEcosystemId(userId: number) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { ecosystemId: true },
+    });
+    if (!user?.ecosystemId) {
+      throw new NotFoundException('Usuário sem ecossistema');
+    }
+    return user.ecosystemId;
+  }
+
   //função para remover nulos
   private removeNulls<T>(obj: any): T {
     Object.keys(obj).forEach((key) => {
@@ -99,6 +110,10 @@ export class SensorsService {
   // criação de um sensor, conectando a um usuário
   async create(createSensorDto: CreateSensorDto, userId: number) {
     const sensor = new SensorEntity(createSensorDto);
+    if (!sensor.location) {
+      sensor.location = '';
+    }
+    const ecosystemId = await this.getEcosystemId(userId);
     if (sensor.plantId) {
       const plant = await this.prisma.plant.findUnique({
         where: { id: sensor.plantId },
@@ -106,6 +121,13 @@ export class SensorsService {
       });
 
       if (!plant) throw new NotFoundException('planta inexistente');
+      const owner = await this.prisma.user.findUnique({
+        where: { id: plant.userId },
+        select: { ecosystemId: true },
+      });
+      if (!owner || owner.ecosystemId !== ecosystemId) {
+        throw new NotFoundException('planta inexistente');
+      }
 
       const idealRange = plant.idealRanges?.find(
         (r) => r.type.toUpperCase() === sensor.type.toUpperCase(),
@@ -140,11 +162,12 @@ export class SensorsService {
         ...(plantId && { plant: { connect: { id: plantId } } }),
       },
     });
-    return this.findOne(created.id);
+    return this.findOne(created.id, userId);
   }
 
   // retorno de todos os sensores, com filtros
   async findAll(query: {
+    userId: number;
     page?: number;
     limit?: number;
     name?: string;
@@ -155,6 +178,7 @@ export class SensorsService {
     orderBy?: 'asc' | 'desc';
   }) {
     const {
+      userId,
       page = 1,
       limit = 10,
       name,
@@ -178,8 +202,10 @@ export class SensorsService {
         `Ordem inválida. Valores aceitos: ${validorder.join(', ')}`,
       );
     }
+    const ecosystemId = await this.getEcosystemId(userId);
     const sensors = await this.prisma.sensor.findMany({
       where: {
+        user: { ecosystemId },
         sensorName: name ? { contains: name, mode: 'insensitive' } : undefined,
         type: type ? type : undefined,
         location: location
@@ -255,7 +281,8 @@ export class SensorsService {
   }
 
   // retorno de 1 sensor
-  async findOne(id: number): Promise<SensorStatusResponse> {
+  async findOne(id: number, userId: number): Promise<SensorStatusResponse> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const sensor = await this.prisma.sensor.findUnique({
       where: { id },
       include: {
@@ -272,6 +299,13 @@ export class SensorsService {
     });
 
     if (!sensor) {
+      throw new NotFoundException(`Sensor com ID ${id} não encontrado`);
+    }
+    const owner = await this.prisma.user.findUnique({
+      where: { id: sensor.userId },
+      select: { ecosystemId: true },
+    });
+    if (!owner || owner.ecosystemId !== ecosystemId) {
       throw new NotFoundException(`Sensor com ID ${id} não encontrado`);
     }
     const { status, alerts } = this.calculateStatus(sensor);
@@ -306,9 +340,18 @@ export class SensorsService {
   async update(
     id: number,
     updateSensorDto: UpdateSensorDto,
+    userId: number,
   ): Promise<SensorStatusResponse> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const sensor = await this.prisma.sensor.findFirst({ where: { id } });
     if (!sensor) {
+      throw new NotFoundException(`Sensor com ID ${id} não encontrado`);
+    }
+    const owner = await this.prisma.user.findUnique({
+      where: { id: sensor.userId },
+      select: { ecosystemId: true },
+    });
+    if (!owner || owner.ecosystemId !== ecosystemId) {
       throw new NotFoundException(`Sensor com ID ${id} não encontrado`);
     }
 
@@ -317,6 +360,13 @@ export class SensorsService {
         where: { id: updateSensorDto.plantId },
       });
       if (!plant) throw new NotFoundException('A planta informada não existe.');
+      const plantOwner = await this.prisma.user.findUnique({
+        where: { id: plant.userId },
+        select: { ecosystemId: true },
+      });
+      if (!plantOwner || plantOwner.ecosystemId !== ecosystemId) {
+        throw new NotFoundException('A planta informada não existe.');
+      }
     }
 
     try {
@@ -324,7 +374,7 @@ export class SensorsService {
         where: { id },
         data: updateSensorDto,
       });
-      return this.findOne(id);
+      return this.findOne(id, userId);
     } catch (e: any) {
       if (e instanceof Prisma.PrismaClientKnownRequestError) {
         if (e.code === 'P2002') {
@@ -338,9 +388,17 @@ export class SensorsService {
   }
 
   // exclusão de sensor
-  async remove(id: number): Promise<void> {
+  async remove(id: number, userId: number): Promise<void> {
+    const ecosystemId = await this.getEcosystemId(userId);
     const sensor = await this.prisma.sensor.findUnique({ where: { id } });
     if (!sensor) {
+      throw new NotFoundException(`Sensor com ID ${id} não encontrado`);
+    }
+    const owner = await this.prisma.user.findUnique({
+      where: { id: sensor.userId },
+      select: { ecosystemId: true },
+    });
+    if (!owner || owner.ecosystemId !== ecosystemId) {
       throw new NotFoundException(`Sensor com ID ${id} não encontrado`);
     }
 
@@ -350,9 +408,12 @@ export class SensorsService {
   }
 
   // retorno de status de sensor
-  async getStatusSensors(): Promise<{ data: SensorStatusResponse[] }> {
+  async getStatusSensors(userId: number): Promise<{ data: SensorStatusResponse[] }> {
     // primeira verificação
-    const existsSensors = await this.prisma.sensor.findFirst();
+    const ecosystemId = await this.getEcosystemId(userId);
+    const existsSensors = await this.prisma.sensor.findFirst({
+      where: { user: { ecosystemId } },
+    });
     if (!existsSensors)
       throw new NotFoundException(
         'Não existe sensores cadastrados no banco de dados',
@@ -362,6 +423,7 @@ export class SensorsService {
     const now = new Date();
 
     const sensors = await this.prisma.sensor.findMany({
+      where: { user: { ecosystemId } },
       include: {
         plant: true,
         readings: {

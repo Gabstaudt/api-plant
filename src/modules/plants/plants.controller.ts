@@ -31,6 +31,7 @@ export class PlantsController {
 
   @Get()
   async findAll(
+    @CurrentUser() user: { userId: number },
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('name') name?: string,
@@ -40,6 +41,7 @@ export class PlantsController {
     @Query('orderBy') orderBy?: 'asc' | 'desc',
   ) {
     return this.plantsService.findAll({
+      userId: user.userId,
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 10,
       name,
@@ -51,31 +53,38 @@ export class PlantsController {
   }
 
   @Get('status')
-  async getSensorsStatus() {
-    return await this.plantsService.getStatusPlants();
+  async getSensorsStatus(@CurrentUser() user: { userId: number }) {
+    return await this.plantsService.getStatusPlants(user.userId);
   }
 
   @Get('options')
-  async getPlantOptions() {
-    return this.plantsService.getOptions();
+  async getPlantOptions(@CurrentUser() user: { userId: number }) {
+    return this.plantsService.getOptions(user.userId);
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<PlantStatusResponse> {
-    return this.plantsService.findOne(+id);
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: number },
+  ): Promise<PlantStatusResponse> {
+    return this.plantsService.findOne(+id, user.userId);
   }
 
   @Patch(':id')
   async update(
     @Param('id') id: string,
     @Body() updatePlantDto: UpdatePlantDto,
+    @CurrentUser() user: { userId: number },
   ): Promise<PlantStatusResponse> {
-    return this.plantsService.update(+id, updatePlantDto);
+    return this.plantsService.update(+id, updatePlantDto, user.userId);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    await this.plantsService.remove(+id);
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: number },
+  ) {
+    await this.plantsService.remove(+id, user.userId);
     return { message: `A planta de ID ${id} foi excluída com sucesso` };
   }
 }

@@ -38,12 +38,13 @@ export class SensorsController {
   }
 
   @Get('status')
-  async getSensorsStatus() {
-    return await this.sensorsService.getStatusSensors();
+  async getSensorsStatus(@CurrentUser() user: { userId: number }) {
+    return await this.sensorsService.getStatusSensors(user.userId);
   }
 
   @Get()
   async findAll(
+    @CurrentUser() user: { userId: number },
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @Query('name') name?: string,
@@ -54,6 +55,7 @@ export class SensorsController {
     @Query('orderBy') orderBy?: 'asc' | 'desc',
   ) {
     return this.sensorsService.findAll({
+      userId: user.userId,
       page: page ? Number(page) : 1,
       limit: limit ? Number(limit) : 10,
       name,
@@ -66,21 +68,28 @@ export class SensorsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string): Promise<SensorStatusResponse> {
-    return this.sensorsService.findOne(+id);
+  findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: number },
+  ): Promise<SensorStatusResponse> {
+    return this.sensorsService.findOne(+id, user.userId);
   }
 
   @Patch(':id')
   async update(
     @Param('id') id: string,
     @Body() updateSensorDto: UpdateSensorDto,
+    @CurrentUser() user: { userId: number },
   ) {
-    return this.sensorsService.update(+id, updateSensorDto);
+    return this.sensorsService.update(+id, updateSensorDto, user.userId);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
-    await this.sensorsService.remove(+id);
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: { userId: number },
+  ) {
+    await this.sensorsService.remove(+id, user.userId);
     return { message: `O sensor de ID ${id} foi excluída com sucesso` };
   }
 

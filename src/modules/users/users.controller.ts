@@ -4,6 +4,7 @@ import { AuthGuard } from '@nestjs/passport';
 
 import { UsersService } from './users.service';
 import { UpdateUserDto } from '../dto/update-user.dto';
+import { ChangePasswordDto } from '../dto/change-password.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -29,26 +30,31 @@ export class UsersController {
     });
   }
 
+  @Patch('me/password')
+  changeMyPassword(@CurrentUser() user: { userId: number }, @Body() body: ChangePasswordDto) {
+    return this.service.changePassword(user.userId, body);
+  }
+
   // ADMIN
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'ADMIN_MASTER')
   @Get()
   findAll() {
     return this.service.findAll();
   }
 
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'ADMIN_MASTER')
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.service.findOne(id);
   }
 
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'ADMIN_MASTER')
   @Patch(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() body: UpdateUserDto) {
     return this.service.update(id, body);
   }
 
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'ADMIN_MASTER')
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);

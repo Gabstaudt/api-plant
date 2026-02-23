@@ -6,6 +6,8 @@ import { UsersModule } from './modules/users/users.module';
 import { PlantsModule } from './modules/plants/plants.module';
 import { SensorsModule } from './modules/sensors/sensors.module';
 import { AlertsModule } from './modules/alerts/alerts.module';
+import { EcosystemsModule } from './modules/ecosystems/ecosystems.module';
+import { RolesModule } from './modules/roles/roles.module';
 
 @Module({
   imports: [
@@ -16,6 +18,8 @@ import { AlertsModule } from './modules/alerts/alerts.module';
     PlantsModule,
     SensorsModule,
     AlertsModule,
+    EcosystemsModule,
+    RolesModule,
   ],
 })
 export class AppModule {}
